@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#221c17">
+  <title>Einprosit · Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <div id="loading" class="gate"><p style="color:var(--ink-3)">Caricamento…</p></div>
+
+  <div id="login" class="gate hidden">
+    <div class="card">
+      <div class="kicker">Einprosit · Admin</div>
+      <h1>Accedi</h1>
+      <p>Ti mandiamo un link di accesso via email.</p>
+      <form id="loginForm">
+        <label>Email
+          <input type="email" id="loginEmail" required autocomplete="email">
+        </label>
+        <button class="btn" type="submit" id="loginBtn">Invia link di accesso</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="denied" class="gate hidden">
+    <div class="card">
+      <div class="kicker">Einprosit · Admin</div>
+      <h1>Non autorizzato</h1>
+      <p id="deniedMsg">Questo account non è abilitato come amministratore.</p>
+      <div class="actions" style="justify-content:center"><button class="btn ghost" data-logout>Esci</button></div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="kicker">Admin · Antica Maddalena</div>
+        <h1>Einprosit</h1>
+        <p>Gestione richieste</p>
+      </div>
+      <ul id="dinnerList" class="dinner-list"></ul>
+      <div class="sidebar-foot"><button class="btn ghost small" style="color:#f3ece0;border-color:#3a322a" data-logout>Esci</button></div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar"><span id="who"></span><span id="live">● aggiornamento in tempo reale</span></div>
+
+      <header class="d-head">
+        <div class="kicker" id="dDate"></div>
+        <h2 id="dTitle"></h2>
+        <p class="sub" id="dSub"></p>
+        <div class="chefs" id="dChefs"></div>
+        <div class="stats" id="stats"></div>
+      </header>
+
+      <h3 class="section-title">Richieste</h3>
+      <div class="filters" id="filters">
+        <button class="chip on" data-f="all">Tutte</button>
+        <button class="chip" data-f="in_attesa">In attesa</button>
+        <button class="chip" data-f="disponibile">Disponibili</button>
+        <button class="chip" data-f="non_disponibile">Non disponibili</button>
+      </div>
+      <ul id="reqList" class="req-list"></ul>
+
+      <h3 class="section-title">Link per gli chef</h3>
+      <div class="card">
+        <p style="margin:0;color:var(--ink-2);font-size:14px">Invia questo link solo agli chef di questa cena. Chi ha il link vede le richieste e può aggiungerne.</p>
+        <div class="linkbox">
+          <input type="text" id="chefLink" readonly>
+          <button class="btn small" id="copyLink" type="button">Copia</button>
+        </div>
+        <div class="actions">
+          <span class="hint">Se il link finisce in mani sbagliate, generane uno nuovo: il vecchio smette di funzionare.</span>
+          <button class="btn danger small" id="rotateLink" type="button">Genera nuovo link</button>
+        </div>
+      </div>
+
+      <h3 class="section-title">Dettagli cena</h3>
+      <form id="dinnerForm" class="card">
+        <div class="form-grid">
+          <label>Titolo <input type="text" id="eTitle" maxlength="80" required></label>
+          <label>Data e ora <input type="datetime-local" id="eDate"></label>
+          <label class="full">Sottotitolo <input type="text" id="eSub" maxlength="120" placeholder="es. Cena a quattro mani"></label>
+          <label class="full">Chef <input type="text" id="eChefs" maxlength="200" placeholder="es. Marco Rossi, Anna Bianchi"></label>
+          <label>Ordine nella lista <input type="number" id="eOrder" min="0" max="99" step="1"></label>
+        </div>
+        <div class="actions"><button class="btn" type="submit">Salva dettagli</button></div>
+      </form>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+  (function () {
+    const { sb, esc, dinnerDate, STATUS, toast, shortDate, price } = window.EP;
+    const $ = (id) => document.getElementById(id);
+    const views = ["loading", "login", "denied", "app"];
+    const show = (id) => views.forEach((v) => $(v).classList.toggle("hidden", v !== id));
+
+    let dinners = [];
+    let requests = [];
+    let currentId = null;
+    let filter = "all";
+    let channel = null;
+    const chefBase = location.origin + location.pathname.replace(/admin\.html$/, "");
+
+    // ---------- auth ----------
+    $("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("loginBtn").disabled = true;
+      const { error } = await sb.auth.signInWithOtp({
+        email: $("loginEmail").value.trim(),
+        options: { emailRedirectTo: location.origin + location.pathname },
+      });
+      $("loginBtn").disabled = false;
+      if (error) return toast(error.message, true);
+      toast("Controlla la tua email e apri il link");
+    });
+
+    document.querySelectorAll("[data-logout]").forEach((b) =>
+      b.addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); }));
+
+    async function boot(session) {
+      if (!session) return show("login");
+      const { data: ok, error } = await sb.rpc("is_admin");
+      if (error || !ok) {
+        $("deniedMsg").textContent = `L'account ${session.user.email} non è abilitato come amministratore.`;
+        return show("denied");
+      }
+      $("who").textContent = session.user.email;
+      show("app");
+      await loadDinners();
+      subscribe();
+    }
+
+    let booted = false;
+    sb.auth.onAuthStateChange((evt, session) => {
+      if (evt === "INITIAL_SESSION" || (evt === "SIGNED_IN" && !booted)) {
+        booted = !!session;
+        boot(session);
+      }
+      if (evt === "SIGNED_OUT") show("login");
+    });
+
+    // ---------- data ----------
+    async function loadDinners() {
+      const { data, error } = await sb.from("dinners").select("*").order("sort_order").order("starts_at");
+      if (error) return toast("Errore caricamento cene", true);
+      dinners = data;
+      if (!currentId || !dinners.find((d) => d.id === currentId)) {
+        currentId = (new URLSearchParams(location.hash.slice(1)).get("d")) || dinners[0]?.id;
+      }
+      await loadRequests();
+    }
+
+    async function loadRequests() {
+      const { data, error } = await sb.from("ingredient_requests").select("*").order("created_at", { ascending: false });
+      if (error) return toast("Errore caricamento richieste", true);
+      requests = data;
+      render();
+    }
+
+    function subscribe() {
+      if (channel) return;
+      channel = sb.channel("requests")
+        .on("postgres_changes", { event: "*", schema: "public", table: "ingredient_requests" }, () => loadRequests())
+        .subscribe((status) => {
+          $("live").style.color = status === "SUBSCRIBED" ? "var(--ok)" : "var(--ink-3)";
+        });
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) loadRequests(); });
+    }
+
+    // ---------- render ----------
+    function render() {
+      const d = dinners.find((x) => x.id === currentId);
+      if (!d) return;
+      history.replaceState(null, "", "#d=" + d.id);
+
+      $("dinnerList").innerHTML = dinners.map((x) => {
+        const pending = requests.filter((r) => r.dinner_id === x.id && r.status === "in_attesa").length;
+        return `<li><button class="dinner-btn ${x.id === currentId ? "active" : ""}" data-id="${x.id}">
+          <span class="d-date">${esc(dinnerDate(x.starts_at))}</span>
+          <span class="d-title">${esc(x.title)}${pending ? `<span class="badge">${pending}</span>` : ""}</span>
+          ${x.subtitle ? `<span class="d-sub">${esc(x.subtitle)}</span>` : ""}
+        </button></li>`;
+      }).join("");
+
+      $("dDate").textContent = dinnerDate(d.starts_at);
+      $("dTitle").textContent = d.title;
+      $("dSub").textContent = d.subtitle || "";
+      $("dChefs").textContent = d.chefs ? "Chef: " + d.chefs : "";
+      $("chefLink").value = chefBase + "#k=" + d.access_token;
+
+      if (document.activeElement?.closest("#dinnerForm") == null) {
+        $("eTitle").value = d.title;
+        $("eSub").value = d.subtitle || "";
+        $("eChefs").value = d.chefs || "";
+        $("eOrder").value = d.sort_order;
+        $("eDate").value = d.starts_at ? toLocalInput(d.starts_at) : "";
+      }
+
+      const mine = requests.filter((r) => r.dinner_id === currentId);
+      const c = { in_attesa: 0, disponibile: 0, non_disponibile: 0 };
+      let total = 0;
+      mine.forEach((r) => { c[r.status]++; if (r.status === "disponibile" && r.price != null) total += Number(r.price); });
+      $("stats").innerHTML = `
+        <span class="stat"><b>${c.in_attesa}</b> in attesa</span>
+        <span class="stat"><b>${c.disponibile}</b> disponibili</span>
+        <span class="stat"><b>${c.non_disponibile}</b> non disponibili</span>
+        <span class="stat">Totale confermato <b>${price(total)}</b></span>`;
+
+      // Non ridisegnare una riga mentre la stai modificando
+      const editing = document.activeElement?.closest(".req")?.dataset.id;
+      const rows = mine.filter((r) => filter === "all" || r.status === filter);
+      if (!rows.length) {
+        $("reqList").innerHTML = `<li class="empty">Nessuna richiesta${filter !== "all" ? " con questo stato" : ""}.</li>`;
+        return;
+      }
+      if (editing && rows.some((r) => r.id === editing)) return;
+
+      $("reqList").innerHTML = rows.map((r) => `
+        <li class="req admin-req" data-id="${r.id}">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
+            <div class="item">${esc(r.item)}${r.quantity ? ` <span class="qty">· ${esc(r.quantity)}</span>` : ""}</div>
+            <span class="pill ${r.status}">${STATUS[r.status]}</span>
+          </div>
+          ${r.notes ? `<div class="notes">${esc(r.notes)}</div>` : ""}
+          <div class="meta"><span class="tag">${esc(r.chef_name)}</span><span>${esc(shortDate(r.created_at))}</span></div>
+          <div class="admin-controls">
+            <label>Disponibilità
+              <select data-k="status">
+                ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === r.status ? "selected" : ""}>${v}</option>`).join("")}
+              </select>
+            </label>
+            <label>Prezzo €
+              <input type="number" data-k="price" min="0" step="0.01" inputmode="decimal" value="${r.price ?? ""}" placeholder="0,00">
+            </label>
+            <label class="note-field">Nota per lo chef
+              <input type="text" data-k="admin_note" maxlength="500" value="${esc(r.admin_note || "")}" placeholder="es. arriva venerdì mattina">
+            </label>
+            <button class="btn small" data-act="save">Salva</button>
+          </div>
+          <div style="text-align:right"><button class="btn danger small" data-act="del" style="padding:4px 10px;font-size:12px">Elimina</button></div>
+        </li>`).join("");
+    }
+
+    function toLocalInput(ts) {
+      const d = new Date(ts);
+      const p = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+
+    // ---------- events ----------
+    $("dinnerList").addEventListener("click", (e) => {
+      const b = e.target.closest(".dinner-btn");
+      if (!b) return;
+      currentId = b.dataset.id;
+      document.activeElement?.blur();
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    $("filters").addEventListener("click", (e) => {
+      const c = e.target.closest(".chip");
+      if (!c) return;
+      filter = c.dataset.f;
+      document.querySelectorAll("#filters .chip").forEach((x) => x.classList.toggle("on", x === c));
+      render();
+    });
+
+    $("reqList").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-act]");
+      if (!btn) return;
+      const li = btn.closest(".req");
+      const id = li.dataset.id;
+
+      if (btn.dataset.act === "del") {
+        if (!confirm("Eliminare definitivamente questa richiesta?")) return;
+        const { error } = await sb.from("ingredient_requests").delete().eq("id", id);
+        if (error) return toast(error.message, true);
+        toast("Richiesta eliminata");
+        btn.blur();
+        return loadRequests();
+      }
+
+      const status = li.querySelector('[data-k="status"]').value;
+      const priceRaw = li.querySelector('[data-k="price"]').value.replace(",", ".");
+      const note = li.querySelector('[data-k="admin_note"]').value.trim();
+      btn.disabled = true;
+      const { error } = await sb.from("ingredient_requests").update({
+        status,
+        price: priceRaw === "" ? null : Number(priceRaw),
+        admin_note: note || null,
+      }).eq("id", id);
+      btn.disabled = false;
+      btn.blur();
+      if (error) return toast(error.message, true);
+      toast("Salvato");
+      loadRequests();
+    });
+
+    $("copyLink").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText($("chefLink").value); toast("Link copiato"); }
+      catch { $("chefLink").select(); toast("Seleziona e copia il link"); }
+    });
+
+    $("rotateLink").addEventListener("click", async () => {
+      if (!confirm("Generare un nuovo link? Quello attuale smetterà di funzionare e andrà rimandato agli chef.")) return;
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      const tok = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+      const { error } = await sb.from("dinners").update({ access_token: tok }).eq("id", currentId);
+      if (error) return toast(error.message, true);
+      toast("Nuovo link generato");
+      loadDinners();
+    });
+
+    $("dinnerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const dt = $("eDate").value;
+      const { error } = await sb.from("dinners").update({
+        title: $("eTitle").value.trim(),
+        subtitle: $("eSub").value.trim() || null,
+        chefs: $("eChefs").value.trim() || null,
+        sort_order: Number($("eOrder").value || 0),
+        starts_at: dt ? new Date(dt).toISOString() : null,
+      }).eq("id", currentId);
+      document.activeElement?.blur();
+      if (error) return toast(error.message, true);
+      toast("Dettagli salvati");
+      loadDinners();
+    });
+  })();
+  </script>
+</body>
+</html>
