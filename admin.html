@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=6">
+  <link rel="stylesheet" href="assets/style.css?v=7">
 </head>
 <body>
 
@@ -20,12 +20,15 @@
     <div class="card">
       <div class="kicker">Einprosit · Admin</div>
       <h1>Sign in</h1>
-      <p>We'll email you a sign-in link.</p>
+      <p>Administrator access.</p>
       <form id="loginForm">
         <label>Email
-          <input type="email" id="loginEmail" required autocomplete="email">
+          <input type="email" id="loginEmail" required autocomplete="username" value="durigon.federico@gmail.com">
         </label>
-        <button class="btn" type="submit" id="loginBtn">Send sign-in link</button>
+        <label>Password
+          <input type="password" id="loginPassword" required autocomplete="current-password">
+        </label>
+        <button class="btn" type="submit" id="loginBtn">Log in</button>
       </form>
     </div>
   </div>
@@ -104,13 +107,13 @@
     $("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       $("loginBtn").disabled = true;
-      const { error } = await sb.auth.signInWithOtp({
+      const { error } = await sb.auth.signInWithPassword({
         email: $("loginEmail").value.trim(),
-        options: { emailRedirectTo: location.origin + location.pathname },
+        password: $("loginPassword").value,
       });
       $("loginBtn").disabled = false;
-      if (error) return toast(error.message, true);
-      toast("Check your email and open the link");
+      if (error) return toast(/invalid/i.test(error.message) ? "Wrong email or password" : error.message, true);
+      $("loginPassword").value = "";
     });
 
     document.querySelectorAll("[data-logout]").forEach((b) =>
@@ -139,7 +142,8 @@
     sb.auth.onAuthStateChange((evt, session) => {
       if (evt === "INITIAL_SESSION" || (evt === "SIGNED_IN" && !booted)) {
         booted = !!session;
-        boot(session);
+        // run outside the auth callback so Supabase calls inside boot() don't deadlock
+        setTimeout(() => boot(session), 0);
       }
       if (evt === "SIGNED_OUT") show("login");
     });

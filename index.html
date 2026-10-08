@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=6">
+  <link rel="stylesheet" href="assets/style.css?v=7">
   <script>
     // Admin sign-in links may land on the homepage: forward them to the admin page.
     (function () {
@@ -89,6 +89,7 @@
           <textarea id="fNotes" maxlength="500" placeholder="Cut, origin, when you need it…"></textarea>
         </label>
       </div>
+      <p class="edit-hint hidden" id="editHint">Changing the ingredient or quantity sends it back to Antica Maddalena for confirmation.</p>
       <div class="actions">
         <span class="hint">Visible to every chef of this dinner.</span>
         <button class="btn ghost" type="button" id="cancelForm">Cancel</button>
@@ -173,7 +174,9 @@
       renderRequests(data || []);
     }
 
+    let rowsById = {};
     function renderRequests(rows) {
+      rowsById = Object.fromEntries(rows.map((r) => [r.id, r]));
       const c = { in_attesa: 0, disponibile: 0, non_disponibile: 0 };
       let total = 0;
       rows.forEach((r) => { c[r.status]++; if (r.status === "disponibile" && r.price != null) total += Number(r.price); });
@@ -197,19 +200,49 @@
           <span class="date">${esc(shortDate(r.created_at))}</span>
           ${r.status === "disponibile" && r.price != null ? `<span class="price">${price(r.price)}</span>` : ""}
           <span class="pill ${r.status}">${STATUS[r.status]}</span>
+          <span class="row-actions">
+            <button type="button" class="row-btn" data-act="edit" data-id="${r.id}" aria-label="Edit request" title="Edit">
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>
+            </button>
+            <button type="button" class="row-btn danger" data-act="del" data-id="${r.id}" aria-label="Delete request" title="Delete">
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+            </button>
+          </span>
         </li>`).join("");
     }
 
     // Tap a row to read long notes in full
-    $("reqList").addEventListener("click", (e) => e.target.closest(".req-row")?.classList.toggle("open"));
+    $("reqList").addEventListener("click", async (e) => {
+      const btn = e.target.closest(".row-btn");
+      if (!btn) { e.target.closest(".req-row")?.classList.toggle("open"); return; }
+      const r = rowsById[btn.dataset.id];
+      if (!r) return;
+      if (btn.dataset.act === "edit") return openForm(r);
+      if (!confirm(`Delete "${r.item}"?`)) return;
+      btn.disabled = true;
+      const { error } = await sb.rpc("delete_request", { p_id: r.id });
+      if (error) { btn.disabled = false; toast(error.message || "Couldn't delete the request", true); return; }
+      toast("Request deleted");
+      loadRequests();
+    });
 
     // ---------- new request dialog ----------
     const dlg = $("formDialog");
 
-    function openForm() {
+    let editing = null; // request being edited, or null for a new one
+
+    function openForm(req) {
+      editing = req && req.id ? req : null;
       const d = current();
       const chefs = chefsOf(d);
-      const last = store.get("ep_chef_by_dinner", {})[d.id];
+      if (editing && !chefs.includes(editing.chef_name)) chefs.push(editing.chef_name);
+      const last = editing ? editing.chef_name : store.get("ep_chef_by_dinner", {})[d.id];
+      $("formTitle").textContent = editing ? "Edit request" : "New request";
+      $("fSubmit").textContent = editing ? "Save changes" : "Send request";
+      $("fItem").value = editing ? editing.item : "";
+      $("fQty").value = editing ? editing.quantity || "" : "";
+      $("fNotes").value = editing ? editing.notes || "" : "";
+      $("editHint").classList.toggle("hidden", !(editing && editing.status !== "in_attesa"));
       $("formDinner").textContent = d.title + " · " + dinnerDate(d.starts_at);
       $("chefOptions").innerHTML = chefs.length
         ? chefs.map((c, i) => `<label class="chef-opt"><input type="radio" name="chef" value="${esc(c)}" required ${c === last || (chefs.length === 1 && i === 0) ? "checked" : ""}><span>${esc(c)}</span></label>`).join("")
@@ -219,7 +252,7 @@
     }
     function closeForm() { dlg.close ? dlg.close() : dlg.removeAttribute("open"); }
 
-    $("openForm").addEventListener("click", openForm);
+    $("openForm").addEventListener("click", () => openForm());
     $("closeForm").addEventListener("click", closeForm);
     $("cancelForm").addEventListener("click", closeForm);
     dlg.addEventListener("click", (e) => { if (e.target === dlg) closeForm(); });
@@ -232,19 +265,22 @@
       const item = $("fItem").value.trim();
       if (!item) return;
       $("fSubmit").disabled = true;
-      const { error } = await sb.rpc("add_request", {
-        p_dinner: currentId,
+      const fields = {
         p_chef_name: chef,
         p_item: item,
         p_quantity: $("fQty").value.trim() || null,
         p_notes: $("fNotes").value.trim() || null,
-      });
+      };
+      const { error } = editing
+        ? await sb.rpc("update_request", { p_id: editing.id, ...fields })
+        : await sb.rpc("add_request", { p_dinner: currentId, ...fields });
       $("fSubmit").disabled = false;
       if (error) { toast(error.message || "Couldn't send the request", true); return; }
       const m = store.get("ep_chef_by_dinner", {}); m[currentId] = chef; store.set("ep_chef_by_dinner", m);
       $("fItem").value = ""; $("fQty").value = ""; $("fNotes").value = "";
       closeForm();
-      toast("Request sent");
+      toast(editing ? "Request updated" : "Request sent");
+      editing = null;
       loadRequests();
     });
 
