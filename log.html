@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=8">
+  <link rel="stylesheet" href="assets/style.css?v=11">
 </head>
 <body>
   <div id="loading" class="gate"><p style="color:var(--ink-3)">Loading…</p></div>
@@ -54,10 +54,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=3"></script>
+  <script src="assets/common.js?v=4"></script>
   <script>
   (function () {
-    const { sb, esc, STATUS, toast, price } = window.EP;
+    const { sb, esc, STATUS, toast, price, setChefColors, chefStyle } = window.EP;
     const $ = (id) => document.getElementById(id);
 
     const LABELS = { chef_name: "Chef", item: "Ingredient", quantity: "Quantity", notes: "Notes", status: "Status", price: "Price", admin_note: "Note for chef" };
@@ -89,10 +89,11 @@
 
     async function load() {
       const [d, l] = await Promise.all([
-        sb.from("dinners").select("id,title,sort_order").order("sort_order"),
+        sb.from("dinners").select("id,title,sort_order,chefs").order("sort_order"),
         sb.from("request_log").select("*").order("id", { ascending: false }).limit(2000),
       ]);
       if (d.error || l.error) return toast("Couldn't load the log", true);
+      setChefColors(d.data);
       dinners = Object.fromEntries(d.data.map((x) => [x.id, x.title]));
       const sel = $("dinnerFilter"), cur = sel.value;
       sel.innerHTML = `<option value="">All dinners</option>` + d.data.map((x) => `<option value="${x.id}">${esc(x.title)}</option>`).join("");
@@ -139,7 +140,7 @@
         return `<li class="log-row ${e.action}">
           <div class="log-main">
             <span class="act ${e.action}">${ACTIONS[e.action] || e.action}</span>
-            <span class="tag">${esc(r.chef_name || "")}</span>
+            <span class="tag" style="${chefStyle(r.chef_name)}">${esc(r.chef_name || "")}</span>
             <span class="item">${esc(r.item || "")}</span>
             <span class="log-dinner">${esc(dinners[e.dinner_id] || "Deleted dinner")}</span>
             <span class="log-time">${esc(fmt.format(new Date(e.at)))}</span>

@@ -152,7 +152,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 .price { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .tag {
-  display: inline-flex; align-items: center; background: var(--brand-soft); color: var(--brand);
+  display: inline-flex; align-items: center; background: var(--tag-bg, var(--brand-soft)); color: var(--tag-fg, var(--brand));
   border-radius: var(--r-pill); padding: 2px 10px; font-size: 12px; font-weight: 500;
 }
 .tag::before { content: "@"; opacity: .6; margin-right: 1px; }
@@ -226,12 +226,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 .chef-opt { display: inline-flex; cursor: pointer; }
 .chef-opt input { position: absolute; opacity: 0; pointer-events: none; }
 .chef-opt span {
-  display: inline-flex; align-items: center; border: 1px solid var(--line); background: var(--card); color: var(--ink-2);
+  display: inline-flex; align-items: center; border: 1px solid transparent; background: var(--tag-bg, var(--surface)); color: var(--tag-fg, var(--ink-2));
   border-radius: var(--r-pill); padding: 7px 14px; font-size: 13px; font-weight: 500; transition: all .15s;
 }
 .chef-opt span::before { content: "@"; opacity: .5; margin-right: 1px; }
-.chef-opt:hover span { border-color: var(--brand-300); }
-.chef-opt input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chef-opt:hover span { border-color: var(--tag-fg, var(--brand-300)); }
+.chef-opt input:checked + span { background: var(--tag-fg, var(--brand)); border-color: var(--tag-fg, var(--brand)); color: #fff; }
 .chef-opt input:focus-visible + span { box-shadow: 0 0 0 3px var(--brand-soft); }
 
 @media (max-width: 860px) {
@@ -256,10 +256,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 .req-row { overflow: hidden; }
 .req-row > * { flex: none; }
 .req-row .tag, .req-row .item, .req-row .qty { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.req-row .tag, .req-row .item, .req-row .qty { flex-shrink: 0; }
 .req-row .item { font-weight: 600; letter-spacing: -.2px; max-width: 32%; overflow: hidden; text-overflow: ellipsis; }
 .req-row .qty { color: var(--ink-2); max-width: 16%; overflow: hidden; text-overflow: ellipsis; }
 .req-row .qty::before { content: "·"; margin-right: 8px; color: var(--ink-3); }
-.req-row .notes { flex: 1 1 auto; min-width: 0; color: var(--ink-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.req-row .notes { flex: 1 1 0; min-width: 0; color: var(--ink-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 .req-row .notes b { font-weight: 500; color: var(--ink-2); }
 .req-row .date { color: var(--ink-3); font-size: 12px; }
 .req-row .price { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -344,9 +345,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
   .req-row .qty { max-width: 22%; }
   .req-row .notes { display: none; }
   .req-row.open .notes { display: block; }
-  .req-row .tag { flex-shrink: 4; }
-  .req-row .qty { flex-shrink: 2; }
+  .req-row .tag { flex-shrink: 1; max-width: 34%; }
+  .req-row .qty { flex-shrink: 3; }
   .req-row .item { flex-shrink: 1; }
+  .req-row .row-actions { display: none; }
+  .req-row.open .row-actions { display: inline-flex; margin-left: auto; }
   .req-row .price { margin-left: auto; }
   .req-row .pill { margin-left: auto; }
   .req-row .price + .pill { margin-left: 0; }

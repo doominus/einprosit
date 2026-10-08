@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=8">
+  <link rel="stylesheet" href="assets/style.css?v=11">
 </head>
 <body>
 
@@ -89,10 +89,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=3"></script>
+  <script src="assets/common.js?v=4"></script>
   <script>
   (function () {
-    const { sb, esc, dinnerDate, STATUS, toast, shortDate, price } = window.EP;
+    const { sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle } = window.EP;
     const $ = (id) => document.getElementById(id);
     const views = ["loading", "login", "denied", "app"];
     const show = (id) => views.forEach((v) => $(v).classList.toggle("hidden", v !== id));
@@ -153,6 +153,7 @@
       const { data, error } = await sb.from("dinners").select("*").order("sort_order").order("starts_at");
       if (error) return toast("Couldn't load dinners", true);
       dinners = data;
+      setChefColors(dinners);
       if (!currentId || !dinners.find((d) => d.id === currentId)) {
         currentId = (new URLSearchParams(location.hash.slice(1)).get("d")) || dinners[0]?.id;
       }
@@ -194,7 +195,7 @@
       $("dDate").textContent = dinnerDate(d.starts_at);
       $("dTitle").textContent = d.title;
       $("dSub").textContent = d.subtitle || "";
-      $("dChefs").innerHTML = (d.chefs || "").split(",").map((c) => c.trim()).filter(Boolean).map((c) => `<span class="tag">${esc(c)}</span>`).join("");
+      $("dChefs").innerHTML = (d.chefs || "").split(",").map((c) => c.trim()).filter(Boolean).map((c) => `<span class="tag" style="${chefStyle(c)}">${esc(c)}</span>`).join("");
 
       if (document.activeElement?.closest("#dinnerForm") == null) {
         $("eTitle").value = d.title;
@@ -230,7 +231,7 @@
             <span class="pill ${r.status}">${STATUS[r.status]}</span>
           </div>
           ${r.notes ? `<div class="notes">${esc(r.notes)}</div>` : ""}
-          <div class="meta"><span class="tag">${esc(r.chef_name)}</span><span>${esc(shortDate(r.created_at))}</span></div>
+          <div class="meta"><span class="tag" style="${chefStyle(r.chef_name)}">${esc(r.chef_name)}</span><span>${esc(shortDate(r.created_at))}</span></div>
           <div class="admin-controls">
             <label>Availability
               <select data-k="status">

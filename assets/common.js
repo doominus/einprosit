@@ -47,7 +47,31 @@
     },
   };
 
+  // One colour per chef, stable across pages: chefs are numbered in dinner order.
+  const PALETTE = [
+    ["#e8f0fe", "#2f6fd6"], ["#e6f6ec", "#1f8a4c"], ["#fdeee0", "#c25e0a"], ["#f1ebfd", "#7a45d6"],
+    ["#fde8f1", "#c22f74"], ["#e2f5f4", "#0f7f7a"], ["#fdeaea", "#c2352d"], ["#fbf3d9", "#946600"],
+    ["#e9ebfc", "#4146c9"], ["#eef6dd", "#557a0c"], ["#e3f3fb", "#0f72a0"], ["#f4ece4", "#8a5a2b"],
+    ["#fbe8fb", "#a8329f"], ["#eceff3", "#4a5566"], ["#fff0e6", "#b34700"], ["#e8f7ef", "#2a7a52"],
+  ];
+  const chefIndex = {};
+  const key = (n) => String(n || "").trim().toLowerCase();
+  function setChefColors(dinners) {
+    let i = 0;
+    (dinners || []).forEach((d) => String(d.chefs || "").split(",").map(key).filter(Boolean).forEach((c) => {
+      if (!(c in chefIndex)) chefIndex[c] = i++;
+    }));
+  }
+  function chefStyle(name) {
+    const k = key(name);
+    let i = chefIndex[k];
+    if (i == null) { i = 0; for (const ch of k) i = (i * 31 + ch.charCodeAt(0)) >>> 0; }
+    const [bg, fg] = PALETTE[i % PALETTE.length];
+    return `--tag-bg:${bg};--tag-fg:${fg}`;
+  }
+
   window.EP = {
+    setChefColors, chefStyle,
     sb, esc, dinnerDate, STATUS, toast, store,
     shortDate: (ts) => (ts ? shortFmt.format(new Date(ts)) : ""),
     price: (n) => (n == null ? "" : priceFmt.format(Number(n))),

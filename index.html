@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=8">
+  <link rel="stylesheet" href="assets/style.css?v=11">
   <script>
     // Admin sign-in links may land on the homepage: forward them to the admin page.
     (function () {
@@ -100,10 +100,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=3"></script>
+  <script src="assets/common.js?v=4"></script>
   <script>
   (function () {
-    const { sb, esc, dinnerDate, STATUS, toast, store, shortDate, price } = window.EP;
+    const { sb, esc, dinnerDate, STATUS, toast, store, shortDate, price, setChefColors, chefStyle } = window.EP;
     const $ = (id) => document.getElementById(id);
 
     let dinners = [];
@@ -118,6 +118,7 @@
       const { data, error } = await sb.rpc("list_dinners");
       if (error || !data || !data.length) return show("gate");
       dinners = data;
+      setChefColors(dinners);
       select(hashDinner(), true);
       show("app");
     }
@@ -162,7 +163,7 @@
       $("dDate").textContent = dinnerDate(d.starts_at);
       $("dTitle").textContent = d.title;
       $("dSub").textContent = d.subtitle || "";
-      $("dChefs").innerHTML = chefsOf(d).map((c) => `<span class="tag">${esc(c)}</span>`).join("");
+      $("dChefs").innerHTML = chefsOf(d).map((c) => `<span class="tag" style="${chefStyle(c)}">${esc(c)}</span>`).join("");
       document.title = d.title + " · Einprosit";
     }
 
@@ -193,7 +194,7 @@
       }
       $("reqList").innerHTML = rows.map((r) => `
         <li class="req-row" tabindex="0" title="${esc([r.item, r.quantity, r.notes, r.admin_note ? "Antica Maddalena: " + r.admin_note : ""].filter(Boolean).join(" · "))}">
-          <span class="tag">${esc(r.chef_name)}</span>
+          <span class="tag" style="${chefStyle(r.chef_name)}">${esc(r.chef_name)}</span>
           <span class="item">${esc(r.item)}</span>
           ${r.quantity ? `<span class="qty">${esc(r.quantity)}</span>` : ""}
           <span class="notes">${esc(r.notes || "")}${r.admin_note ? `${r.notes ? " · " : ""}<b>Antica Maddalena:</b> ${esc(r.admin_note)}` : ""}</span>
@@ -245,7 +246,7 @@
       $("editHint").classList.toggle("hidden", !(editing && editing.status !== "in_attesa"));
       $("formDinner").textContent = d.title + " · " + dinnerDate(d.starts_at);
       $("chefOptions").innerHTML = chefs.length
-        ? chefs.map((c, i) => `<label class="chef-opt"><input type="radio" name="chef" value="${esc(c)}" required ${c === last || (chefs.length === 1 && i === 0) ? "checked" : ""}><span>${esc(c)}</span></label>`).join("")
+        ? chefs.map((c, i) => `<label class="chef-opt" style="${chefStyle(c)}"><input type="radio" name="chef" value="${esc(c)}" required ${c === last || (chefs.length === 1 && i === 0) ? "checked" : ""}><span>${esc(c)}</span></label>`).join("")
         : `<span class="hint">No chefs listed for this dinner yet.</span>`;
       if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
       setTimeout(() => (document.querySelector('input[name="chef"]:checked') ? $("fItem") : document.querySelector('input[name="chef"]') || $("fItem")).focus(), 50);
