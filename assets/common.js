@@ -12,7 +12,8 @@
     if (!ts) return "Data da definire";
     const d = new Date(ts);
     const t = timeFmt.format(d);
-    return dateFmt.format(d) + (t !== "00:00" ? " · " + t : "");
+    const out = dateFmt.format(d) + (t !== "00:00" ? " · " + t : "");
+    return out.charAt(0).toUpperCase() + out.slice(1);
   }
 
   const STATUS = {

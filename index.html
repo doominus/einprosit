@@ -6,11 +6,11 @@
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="googlebot" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#221c17">
+  <meta name="theme-color" content="#eeeef1">
   <title>Einprosit · Richieste ingredienti</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -19,9 +19,9 @@
   <div id="gate" class="gate hidden">
     <div class="card">
       <div class="kicker">Einprosit · Antica Maddalena</div>
-      <h1>Accesso riservato</h1>
-      <p>Questa pagina è riservata agli chef delle cene Einprosit.</p>
-      <p>Apri il link personale che hai ricevuto dall'organizzazione.</p>
+      <h1>Pagina non disponibile</h1>
+      <p>Non riesco a caricare le cene in questo momento.</p>
+      <p>Riprova tra qualche minuto.</p>
     </div>
   </div>
 
@@ -35,7 +35,7 @@
         <p>Le cene del weekend</p>
       </div>
       <ul id="dinnerList" class="dinner-list"></ul>
-      <div class="sidebar-foot">Ogni cena si apre con il proprio link. Le cene con il lucchetto richiedono il loro link.</div>
+      <div class="sidebar-foot">Scegli una cena per vedere le richieste e aggiungerne di nuove.</div>
     </aside>
 
     <main class="main">
@@ -82,43 +82,42 @@
     const { sb, esc, dinnerDate, STATUS, toast, store, shortDate, price } = window.EP;
     const $ = (id) => document.getElementById(id);
 
-    // Il token sta nell'hash (#k=...): non viene mai inviato a server o log.
-    function readToken() {
-      const h = new URLSearchParams(location.hash.slice(1));
-      const q = new URLSearchParams(location.search);
-      const t = h.get("k") || q.get("k");
-      if (q.get("k")) history.replaceState(null, "", location.pathname + "#k=" + q.get("k"));
-      return t && /^[a-f0-9]{16,64}$/i.test(t) ? t : null;
-    }
-
-    let token = readToken();
     let dinners = [];
-    const known = store.get("ep_tokens", {}); // dinnerId -> token, per passare tra le cene già aperte
+    let currentId = null;
 
     function show(id) {
       ["gate", "loading", "app"].forEach((x) => $(x).classList.toggle("hidden", x !== id));
     }
 
+    const hashDinner = () => new URLSearchParams(location.hash.slice(1)).get("d");
+
     async function loadDinners() {
-      if (!token) return show("gate");
-      const { data, error } = await sb.rpc("chef_dinners", { p_token: token });
+      const { data, error } = await sb.rpc("list_dinners");
       if (error || !data || !data.length) return show("gate");
       dinners = data;
-      const cur = dinners.find((d) => d.is_current);
-      if (cur) { known[cur.id] = token; store.set("ep_tokens", known); }
+      select(hashDinner(), true);
+      show("app");
+    }
+
+    function select(id, initial) {
+      const d = dinners.find((x) => x.id === id) || dinners[0];
+      currentId = d.id;
+      if (hashDinner() !== d.id) history.replaceState(null, "", "#d=" + d.id);
       renderSidebar();
       renderHeader();
-      show("app");
-      await loadRequests();
+      $("reqList").innerHTML = "";
+      loadRequests();
+      if (!initial && window.matchMedia("(max-width: 860px)").matches) {
+        document.querySelector(".main").scrollIntoView({ behavior: "smooth" });
+      }
     }
 
     function renderSidebar() {
       $("dinnerList").innerHTML = dinners.map((d) => {
-        const can = d.is_current || known[d.id];
-        return `<li><button class="dinner-btn ${d.is_current ? "active" : ""}" data-id="${d.id}" ${can ? "" : "disabled"}
-            aria-current="${d.is_current ? "page" : "false"}">
+        const on = d.id === currentId;
+        return `<li><button class="dinner-btn ${on ? "active" : ""}" data-id="${d.id}" aria-current="${on ? "page" : "false"}">
           <span class="d-date">${esc(dinnerDate(d.starts_at))}</span>
-          <span class="d-title">${esc(d.title)} ${can ? "" : '<span class="lock" aria-label="bloccata">🔒</span>'}</span>
+          <span class="d-title">${esc(d.title)}</span>
           ${d.subtitle ? `<span class="d-sub">${esc(d.subtitle)}</span>` : ""}
           ${d.chefs ? `<span class="d-meta">${esc(d.chefs)}</span>` : ""}
         </button></li>`;
@@ -127,18 +126,16 @@
 
     $("dinnerList").addEventListener("click", (e) => {
       const b = e.target.closest(".dinner-btn");
-      if (!b || b.disabled || b.classList.contains("active")) return;
-      const t = known[b.dataset.id];
-      if (t) location.hash = "k=" + t;
+      if (b && b.dataset.id !== currentId) select(b.dataset.id);
     });
 
     window.addEventListener("hashchange", () => {
-      const t = readToken();
-      if (t && t !== token) { token = t; loadDinners(); }
+      const id = hashDinner();
+      if (id && id !== currentId && dinners.some((d) => d.id === id)) select(id, true);
     });
 
     function renderHeader() {
-      const d = dinners.find((x) => x.is_current);
+      const d = dinners.find((x) => x.id === currentId);
       $("dDate").textContent = dinnerDate(d.starts_at);
       $("dTitle").textContent = d.title;
       $("dSub").textContent = d.subtitle || "";
@@ -147,7 +144,9 @@
     }
 
     async function loadRequests() {
-      const { data, error } = await sb.rpc("chef_requests", { p_token: token });
+      const id = currentId;
+      const { data, error } = await sb.rpc("list_requests", { p_dinner: id });
+      if (id !== currentId) return;
       if (error) { toast("Impossibile caricare le richieste", true); return; }
       renderRequests(data || []);
     }
@@ -189,8 +188,8 @@
       const item = $("fItem").value.trim();
       if (!chef || !item) return;
       $("fSubmit").disabled = true;
-      const { error } = await sb.rpc("chef_add_request", {
-        p_token: token,
+      const { error } = await sb.rpc("add_request", {
+        p_dinner: currentId,
         p_chef_name: chef,
         p_item: item,
         p_quantity: $("fQty").value.trim() || null,
@@ -206,8 +205,8 @@
     });
 
     // Aggiornamento automatico
-    setInterval(() => { if (!document.hidden && token) loadRequests(); }, 20000);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden && token) loadRequests(); });
+    setInterval(() => { if (!document.hidden && currentId) loadRequests(); }, 20000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && currentId) loadRequests(); });
 
     loadDinners();
   })();

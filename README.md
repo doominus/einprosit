@@ -3,16 +3,14 @@
 Pagina riservata agli chef delle cene Einprosit all'Antica Maddalena.
 Sito statico (GitHub Pages) + database Supabase (progetto **EPManager**).
 
-- `index.html` — pagina chef. Si apre solo con il link segreto della cena (`…/#k=<codice>`).
-- `admin.html` — pagina amministratore: login via email, conferma disponibilità e prezzo, modifica dettagli cena, copia/rigenera i link per gli chef.
+- `index.html` — homepage per gli chef: le 4 cene a sinistra, cliccando si vedono e si aggiungono le richieste.
+- `admin.html` — pagina amministratore: login via email, conferma disponibilità e prezzo, modifica dettagli cena.
 - `assets/` — stile, configurazione Supabase (chiave pubblica), funzioni comuni.
 
-## Come funziona la riservatezza
-- Senza un link valido la pagina mostra solo "Accesso riservato".
-- Ogni cena ha un proprio codice: chi ha il link di una cena vede solo le richieste di quella cena.
-- Il codice sta dopo `#`, quindi non finisce nei log del server né nei referrer.
+## Riservatezza
+- Un solo link: `https://einprosit.anticamaddalena.it`, da dare solo agli chef.
 - Tutte le pagine hanno `noindex, nofollow`: i motori di ricerca non le indicizzano.
-- Le tabelle non sono leggibili direttamente: gli chef passano solo da funzioni che richiedono il codice; l'admin è controllato dalla tabella `admins`.
+- Le tabelle non sono leggibili né modificabili direttamente: gli chef passano da funzioni che possono solo leggere e aggiungere richieste; conferme, prezzi e modifiche sono riservati agli admin (tabella `admins`).
 
 ## Pubblicazione su GitHub Pages
 1. Carica questi file in un repository GitHub (pubblico, per GitHub Pages gratuito).

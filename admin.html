@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#221c17">
+  <meta name="theme-color" content="#eeeef1">
   <title>Einprosit · Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -70,19 +70,6 @@
       </div>
       <ul id="reqList" class="req-list"></ul>
 
-      <h3 class="section-title">Link per gli chef</h3>
-      <div class="card">
-        <p style="margin:0;color:var(--ink-2);font-size:14px">Invia questo link solo agli chef di questa cena. Chi ha il link vede le richieste e può aggiungerne.</p>
-        <div class="linkbox">
-          <input type="text" id="chefLink" readonly>
-          <button class="btn small" id="copyLink" type="button">Copia</button>
-        </div>
-        <div class="actions">
-          <span class="hint">Se il link finisce in mani sbagliate, generane uno nuovo: il vecchio smette di funzionare.</span>
-          <button class="btn danger small" id="rotateLink" type="button">Genera nuovo link</button>
-        </div>
-      </div>
-
       <h3 class="section-title">Dettagli cena</h3>
       <form id="dinnerForm" class="card">
         <div class="form-grid">
@@ -112,7 +99,6 @@
     let currentId = null;
     let filter = "all";
     let channel = null;
-    const chefBase = location.origin + location.pathname.replace(/admin\.html$/, "");
 
     // ---------- auth ----------
     $("loginForm").addEventListener("submit", async (e) => {
@@ -199,7 +185,6 @@
       $("dTitle").textContent = d.title;
       $("dSub").textContent = d.subtitle || "";
       $("dChefs").textContent = d.chefs ? "Chef: " + d.chefs : "";
-      $("chefLink").value = chefBase + "#k=" + d.access_token;
 
       if (document.activeElement?.closest("#dinnerForm") == null) {
         $("eTitle").value = d.title;
@@ -307,21 +292,6 @@
       if (error) return toast(error.message, true);
       toast("Salvato");
       loadRequests();
-    });
-
-    $("copyLink").addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText($("chefLink").value); toast("Link copiato"); }
-      catch { $("chefLink").select(); toast("Seleziona e copia il link"); }
-    });
-
-    $("rotateLink").addEventListener("click", async () => {
-      if (!confirm("Generare un nuovo link? Quello attuale smetterà di funzionare e andrà rimandato agli chef.")) return;
-      const bytes = crypto.getRandomValues(new Uint8Array(16));
-      const tok = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-      const { error } = await sb.from("dinners").update({ access_token: tok }).eq("id", currentId);
-      if (error) return toast(error.message, true);
-      toast("Nuovo link generato");
-      loadDinners();
     });
 
     $("dinnerForm").addEventListener("submit", async (e) => {
