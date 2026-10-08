@@ -3,13 +3,13 @@
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  const dateFmt = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Rome" });
-  const timeFmt = new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
-  const shortFmt = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
-  const priceFmt = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
+  const dateFmt = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Rome" });
+  const timeFmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+  const shortFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+  const priceFmt = new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR" });
 
   function dinnerDate(ts) {
-    if (!ts) return "Data da definire";
+    if (!ts) return "Date to be confirmed";
     const d = new Date(ts);
     const t = timeFmt.format(d);
     const out = dateFmt.format(d) + (t !== "00:00" ? " · " + t : "");
@@ -17,9 +17,9 @@
   }
 
   const STATUS = {
-    in_attesa: "In attesa",
-    disponibile: "Disponibile",
-    non_disponibile: "Non disponibile",
+    in_attesa: "Pending",
+    disponibile: "Available",
+    non_disponibile: "Not available",
   };
 
   let toastTimer;

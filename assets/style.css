@@ -197,7 +197,53 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 18px; font-size: 12px; color: var(--ink-3); flex-wrap: wrap; }
 .badge { background: var(--brand-300); color: #fff; border-radius: var(--r-pill); font-size: 10px; padding: 1px 7px; font-weight: 600; margin-left: auto; }
-.sidebar-foot .btn.ghost { color: var(--ink-2) !important; border-color: var(--line) !important; }
+
+
+/* ---------- list header, chef tags ---------- */
+.chef-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.chef-tags .tag::before { content: ""; margin: 0; }
+.list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 30px 0 12px; }
+.list-head .section-title { margin: 0; }
+
+/* ---------- dialog / sheet ---------- */
+.sheet {
+  border: 0; padding: 0; border-radius: var(--r-lg); width: min(520px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px); background: var(--card); color: var(--ink);
+}
+.sheet::backdrop { background: rgba(22, 24, 29, .35); backdrop-filter: blur(2px); }
+.sheet form { padding: 22px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: start; gap: 10px; margin-bottom: 16px; }
+.sheet-head h3 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.4px; }
+.sheet-sub { margin: 2px 0 0; color: var(--ink-3); font-size: 12px; }
+.icon-btn {
+  border: 0; background: var(--surface); width: 34px; height: 34px; border-radius: 50%;
+  font-size: 20px; line-height: 1; cursor: pointer; color: var(--ink-2); flex: none;
+}
+.icon-btn:hover { background: var(--line); }
+.chef-pick { border: 0; margin: 0 0 14px; padding: 0; }
+.chef-pick legend { font-size: 12px; color: var(--ink-2); font-weight: 500; padding: 0; margin-bottom: 8px; }
+.chef-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.chef-opt { display: inline-flex; cursor: pointer; }
+.chef-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.chef-opt span {
+  display: inline-flex; align-items: center; border: 1px solid var(--line); background: var(--card); color: var(--ink-2);
+  border-radius: var(--r-pill); padding: 7px 14px; font-size: 13px; font-weight: 500; transition: all .15s;
+}
+.chef-opt span::before { content: "@"; opacity: .5; margin-right: 1px; }
+.chef-opt:hover span { border-color: var(--brand-300); }
+.chef-opt input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chef-opt input:focus-visible + span { box-shadow: 0 0 0 3px var(--brand-soft); }
+
+@media (max-width: 860px) {
+  .sheet {
+    width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 22px 22px 0 0;
+    max-height: 92dvh;
+  }
+  .sheet form { padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .sheet .actions .hint { width: 100%; }
+  .sheet .actions .btn { flex: 1; }
+  .list-head .btn { height: 38px; padding: 0 16px; }
+}
 
 /* ---------- mobile ---------- */
 @media (max-width: 860px) {

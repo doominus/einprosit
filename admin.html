@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,18 +14,18 @@
 </head>
 <body>
 
-  <div id="loading" class="gate"><p style="color:var(--ink-3)">Caricamento…</p></div>
+  <div id="loading" class="gate"><p style="color:var(--ink-3)">Loading…</p></div>
 
   <div id="login" class="gate hidden">
     <div class="card">
       <div class="kicker">Einprosit · Admin</div>
-      <h1>Accedi</h1>
-      <p>Ti mandiamo un link di accesso via email.</p>
+      <h1>Sign in</h1>
+      <p>We'll email you a sign-in link.</p>
       <form id="loginForm">
         <label>Email
           <input type="email" id="loginEmail" required autocomplete="email">
         </label>
-        <button class="btn" type="submit" id="loginBtn">Invia link di accesso</button>
+        <button class="btn" type="submit" id="loginBtn">Send sign-in link</button>
       </form>
     </div>
   </div>
@@ -33,9 +33,9 @@
   <div id="denied" class="gate hidden">
     <div class="card">
       <div class="kicker">Einprosit · Admin</div>
-      <h1>Non autorizzato</h1>
-      <p id="deniedMsg">Questo account non è abilitato come amministratore.</p>
-      <div class="actions" style="justify-content:center"><button class="btn ghost" data-logout>Esci</button></div>
+      <h1>Not authorised</h1>
+      <p id="deniedMsg">This account is not enabled as an administrator.</p>
+      <div class="actions" style="justify-content:center"><button class="btn ghost" data-logout>Sign out</button></div>
     </div>
   </div>
 
@@ -44,42 +44,42 @@
       <div class="brand">
         <div class="kicker">Admin · Antica Maddalena</div>
         <h1>Einprosit</h1>
-        <p>Gestione richieste</p>
+        <p>Request management</p>
       </div>
       <ul id="dinnerList" class="dinner-list"></ul>
-      <div class="sidebar-foot"><button class="btn ghost small" style="color:#f3ece0;border-color:#3a322a" data-logout>Esci</button></div>
+      <div class="sidebar-foot"><button class="btn ghost small" data-logout>Sign out</button></div>
     </aside>
 
     <main class="main">
-      <div class="topbar"><span id="who"></span><span id="live">● aggiornamento in tempo reale</span></div>
+      <div class="topbar"><span id="who"></span><span id="live">● live updates</span></div>
 
       <header class="d-head">
         <div class="kicker" id="dDate"></div>
         <h2 id="dTitle"></h2>
         <p class="sub" id="dSub"></p>
-        <div class="chefs" id="dChefs"></div>
+        <div class="chef-tags" id="dChefs"></div>
         <div class="stats" id="stats"></div>
       </header>
 
-      <h3 class="section-title">Richieste</h3>
+      <h3 class="section-title">Requests</h3>
       <div class="filters" id="filters">
-        <button class="chip on" data-f="all">Tutte</button>
-        <button class="chip" data-f="in_attesa">In attesa</button>
-        <button class="chip" data-f="disponibile">Disponibili</button>
-        <button class="chip" data-f="non_disponibile">Non disponibili</button>
+        <button class="chip on" data-f="all">All</button>
+        <button class="chip" data-f="in_attesa">Pending</button>
+        <button class="chip" data-f="disponibile">Available</button>
+        <button class="chip" data-f="non_disponibile">Not available</button>
       </div>
       <ul id="reqList" class="req-list"></ul>
 
-      <h3 class="section-title">Dettagli cena</h3>
+      <h3 class="section-title">Dinner details</h3>
       <form id="dinnerForm" class="card">
         <div class="form-grid">
-          <label>Titolo <input type="text" id="eTitle" maxlength="80" required></label>
-          <label>Data e ora <input type="datetime-local" id="eDate"></label>
-          <label class="full">Sottotitolo <input type="text" id="eSub" maxlength="120" placeholder="es. Cena a quattro mani"></label>
-          <label class="full">Chef <input type="text" id="eChefs" maxlength="200" placeholder="es. Marco Rossi, Anna Bianchi"></label>
-          <label>Ordine nella lista <input type="number" id="eOrder" min="0" max="99" step="1"></label>
+          <label>Title <input type="text" id="eTitle" maxlength="80" required></label>
+          <label>Date &amp; time <input type="datetime-local" id="eDate"></label>
+          <label class="full">Subtitle <input type="text" id="eSub" maxlength="120" placeholder="e.g. Four-hands dinner"></label>
+          <label class="full">Chefs <span style="font-weight:400;color:var(--ink-3)">(comma-separated — these become the name tags chefs pick from)</span> <input type="text" id="eChefs" maxlength="200" placeholder="e.g. Rossi, Bianchi"></label>
+          <label>Order in list <input type="number" id="eOrder" min="0" max="99" step="1"></label>
         </div>
-        <div class="actions"><button class="btn" type="submit">Salva dettagli</button></div>
+        <div class="actions"><button class="btn" type="submit">Save details</button></div>
       </form>
     </main>
   </div>
@@ -110,7 +110,7 @@
       });
       $("loginBtn").disabled = false;
       if (error) return toast(error.message, true);
-      toast("Controlla la tua email e apri il link");
+      toast("Check your email and open the link");
     });
 
     document.querySelectorAll("[data-logout]").forEach((b) =>
@@ -120,7 +120,7 @@
       if (!session) return show("login");
       const { data: ok, error } = await sb.rpc("is_admin");
       if (error || !ok) {
-        $("deniedMsg").textContent = `L'account ${session.user.email} non è abilitato come amministratore.`;
+        $("deniedMsg").textContent = `${session.user.email} is not enabled as an administrator.`;
         return show("denied");
       }
       $("who").textContent = session.user.email;
@@ -141,7 +141,7 @@
     // ---------- data ----------
     async function loadDinners() {
       const { data, error } = await sb.from("dinners").select("*").order("sort_order").order("starts_at");
-      if (error) return toast("Errore caricamento cene", true);
+      if (error) return toast("Couldn't load dinners", true);
       dinners = data;
       if (!currentId || !dinners.find((d) => d.id === currentId)) {
         currentId = (new URLSearchParams(location.hash.slice(1)).get("d")) || dinners[0]?.id;
@@ -151,7 +151,7 @@
 
     async function loadRequests() {
       const { data, error } = await sb.from("ingredient_requests").select("*").order("created_at", { ascending: false });
-      if (error) return toast("Errore caricamento richieste", true);
+      if (error) return toast("Couldn't load requests", true);
       requests = data;
       render();
     }
@@ -184,7 +184,7 @@
       $("dDate").textContent = dinnerDate(d.starts_at);
       $("dTitle").textContent = d.title;
       $("dSub").textContent = d.subtitle || "";
-      $("dChefs").textContent = d.chefs ? "Chef: " + d.chefs : "";
+      $("dChefs").innerHTML = (d.chefs || "").split(",").map((c) => c.trim()).filter(Boolean).map((c) => `<span class="tag">${esc(c)}</span>`).join("");
 
       if (document.activeElement?.closest("#dinnerForm") == null) {
         $("eTitle").value = d.title;
@@ -199,16 +199,16 @@
       let total = 0;
       mine.forEach((r) => { c[r.status]++; if (r.status === "disponibile" && r.price != null) total += Number(r.price); });
       $("stats").innerHTML = `
-        <span class="stat"><b>${c.in_attesa}</b> in attesa</span>
-        <span class="stat"><b>${c.disponibile}</b> disponibili</span>
-        <span class="stat"><b>${c.non_disponibile}</b> non disponibili</span>
-        <span class="stat">Totale confermato <b>${price(total)}</b></span>`;
+        <span class="stat"><b>${c.in_attesa}</b> pending</span>
+        <span class="stat"><b>${c.disponibile}</b> available</span>
+        <span class="stat"><b>${c.non_disponibile}</b> not available</span>
+        <span class="stat"><b>${price(total)}</b> confirmed total</span>`;
 
-      // Non ridisegnare una riga mentre la stai modificando
+      // Don't redraw a row while it is being edited
       const editing = document.activeElement?.closest(".req")?.dataset.id;
       const rows = mine.filter((r) => filter === "all" || r.status === filter);
       if (!rows.length) {
-        $("reqList").innerHTML = `<li class="empty">Nessuna richiesta${filter !== "all" ? " con questo stato" : ""}.</li>`;
+        $("reqList").innerHTML = `<li class="empty">No requests${filter !== "all" ? " with this status" : ""}.</li>`;
         return;
       }
       if (editing && rows.some((r) => r.id === editing)) return;
@@ -222,20 +222,20 @@
           ${r.notes ? `<div class="notes">${esc(r.notes)}</div>` : ""}
           <div class="meta"><span class="tag">${esc(r.chef_name)}</span><span>${esc(shortDate(r.created_at))}</span></div>
           <div class="admin-controls">
-            <label>Disponibilità
+            <label>Availability
               <select data-k="status">
                 ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === r.status ? "selected" : ""}>${v}</option>`).join("")}
               </select>
             </label>
-            <label>Prezzo €
-              <input type="number" data-k="price" min="0" step="0.01" inputmode="decimal" value="${r.price ?? ""}" placeholder="0,00">
+            <label>Price €
+              <input type="number" data-k="price" min="0" step="0.01" inputmode="decimal" value="${r.price ?? ""}" placeholder="0.00">
             </label>
-            <label class="note-field">Nota per lo chef
-              <input type="text" data-k="admin_note" maxlength="500" value="${esc(r.admin_note || "")}" placeholder="es. arriva venerdì mattina">
+            <label class="note-field">Note for the chef
+              <input type="text" data-k="admin_note" maxlength="500" value="${esc(r.admin_note || "")}" placeholder="e.g. arrives Friday morning">
             </label>
-            <button class="btn small" data-act="save">Salva</button>
+            <button class="btn small" data-act="save">Save</button>
           </div>
-          <div style="text-align:right"><button class="btn danger small" data-act="del" style="padding:4px 10px;font-size:12px">Elimina</button></div>
+          <div style="text-align:right"><button class="btn danger small" data-act="del" style="padding:4px 10px;font-size:12px">Delete</button></div>
         </li>`).join("");
     }
 
@@ -270,10 +270,10 @@
       const id = li.dataset.id;
 
       if (btn.dataset.act === "del") {
-        if (!confirm("Eliminare definitivamente questa richiesta?")) return;
+        if (!confirm("Delete this request permanently?")) return;
         const { error } = await sb.from("ingredient_requests").delete().eq("id", id);
         if (error) return toast(error.message, true);
-        toast("Richiesta eliminata");
+        toast("Request deleted");
         btn.blur();
         return loadRequests();
       }
@@ -290,7 +290,7 @@
       btn.disabled = false;
       btn.blur();
       if (error) return toast(error.message, true);
-      toast("Salvato");
+      toast("Saved");
       loadRequests();
     });
 
@@ -306,7 +306,7 @@
       }).eq("id", currentId);
       document.activeElement?.blur();
       if (error) return toast(error.message, true);
-      toast("Dettagli salvati");
+      toast("Details saved");
       loadDinners();
     });
   })();

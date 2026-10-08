@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,7 +7,7 @@
   <meta name="googlebot" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#eeeef1">
-  <title>Einprosit · Richieste ingredienti</title>
+  <title>Einprosit · Ingredient requests</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,27 +15,26 @@
 </head>
 <body>
 
-  <!-- Nessun link valido -->
   <div id="gate" class="gate hidden">
     <div class="card">
       <div class="kicker">Einprosit · Antica Maddalena</div>
-      <h1>Pagina non disponibile</h1>
-      <p>Non riesco a caricare le cene in questo momento.</p>
-      <p>Riprova tra qualche minuto.</p>
+      <h1>Page unavailable</h1>
+      <p>We couldn't load the dinners right now.</p>
+      <p>Please try again in a few minutes.</p>
     </div>
   </div>
 
-  <div id="loading" class="gate"><p style="color:var(--ink-3)">Caricamento…</p></div>
+  <div id="loading" class="gate"><p style="color:var(--ink-3)">Loading…</p></div>
 
   <div id="app" class="app hidden">
     <aside class="sidebar">
       <div class="brand">
         <div class="kicker">Antica Maddalena</div>
         <h1>Einprosit</h1>
-        <p>Le cene del weekend</p>
+        <p>The weekend dinners</p>
       </div>
       <ul id="dinnerList" class="dinner-list"></ul>
-      <div class="sidebar-foot">Scegli una cena per vedere le richieste e aggiungerne di nuove.</div>
+      <div class="sidebar-foot">Pick a dinner to see its ingredient requests and add new ones.</div>
     </aside>
 
     <main class="main">
@@ -43,36 +42,51 @@
         <div class="kicker" id="dDate"></div>
         <h2 id="dTitle"></h2>
         <p class="sub" id="dSub"></p>
-        <div class="chefs" id="dChefs"></div>
+        <div class="chef-tags" id="dChefs"></div>
         <div class="stats" id="stats"></div>
       </header>
 
-      <h3 class="section-title">Nuova richiesta</h3>
-      <form id="reqForm" class="card" autocomplete="off">
-        <div class="form-grid">
-          <label class="full">Ingrediente / prodotto
-            <input type="text" id="fItem" maxlength="120" required placeholder="es. Burro di malga, trota iridea…">
-          </label>
-          <label>Quantità
-            <input type="text" id="fQty" maxlength="60" placeholder="es. 3 kg, 12 pezzi">
-          </label>
-          <label>Il tuo nome (chef)
-            <input type="text" id="fChef" maxlength="60" required placeholder="es. Marco Rossi" autocomplete="name">
-          </label>
-          <label class="full"><span>Note <span style="font-weight:400;color:var(--ink-3)">(facoltative)</span></span>
-            <textarea id="fNotes" maxlength="500" placeholder="Taglio, provenienza, quando ti serve…"></textarea>
-          </label>
-        </div>
-        <div class="actions">
-          <span class="hint">La richiesta sarà visibile a tutti gli chef di questa cena.</span>
-          <button class="btn" type="submit" id="fSubmit">Invia richiesta</button>
-        </div>
-      </form>
-
-      <h3 class="section-title">Richieste <span id="count" style="color:var(--ink-3);font-weight:500"></span></h3>
+      <div class="list-head">
+        <h3 class="section-title">Requests <span id="count" style="color:var(--ink-3);font-weight:500"></span></h3>
+        <button class="btn" type="button" id="openForm"><span aria-hidden="true">+</span> New request</button>
+      </div>
       <ul id="reqList" class="req-list"></ul>
     </main>
   </div>
+
+  <dialog id="formDialog" class="sheet" aria-labelledby="formTitle">
+    <form id="reqForm" autocomplete="off">
+      <div class="sheet-head">
+        <div>
+          <h3 id="formTitle">New request</h3>
+          <p class="sheet-sub" id="formDinner"></p>
+        </div>
+        <button type="button" class="icon-btn" id="closeForm" aria-label="Close">×</button>
+      </div>
+
+      <fieldset class="chef-pick">
+        <legend>Chef</legend>
+        <div class="chef-options" id="chefOptions"></div>
+      </fieldset>
+
+      <div class="form-grid">
+        <label class="full">Ingredient / product
+          <input type="text" id="fItem" maxlength="120" required placeholder="e.g. Alpine butter, rainbow trout…">
+        </label>
+        <label class="full">Quantity
+          <input type="text" id="fQty" maxlength="60" placeholder="e.g. 3 kg, 12 pieces">
+        </label>
+        <label class="full"><span>Notes <span style="font-weight:400;color:var(--ink-3)">(optional)</span></span>
+          <textarea id="fNotes" maxlength="500" placeholder="Cut, origin, when you need it…"></textarea>
+        </label>
+      </div>
+      <div class="actions">
+        <span class="hint">Visible to every chef of this dinner.</span>
+        <button class="btn ghost" type="button" id="cancelForm">Cancel</button>
+        <button class="btn" type="submit" id="fSubmit">Send request</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js"></script>
@@ -85,11 +99,10 @@
     let dinners = [];
     let currentId = null;
 
-    function show(id) {
-      ["gate", "loading", "app"].forEach((x) => $(x).classList.toggle("hidden", x !== id));
-    }
-
+    const show = (id) => ["gate", "loading", "app"].forEach((x) => $(x).classList.toggle("hidden", x !== id));
     const hashDinner = () => new URLSearchParams(location.hash.slice(1)).get("d");
+    const chefsOf = (d) => (d && d.chefs ? d.chefs.split(",").map((c) => c.trim()).filter(Boolean) : []);
+    const current = () => dinners.find((x) => x.id === currentId);
 
     async function loadDinners() {
       const { data, error } = await sb.rpc("list_dinners");
@@ -135,11 +148,11 @@
     });
 
     function renderHeader() {
-      const d = dinners.find((x) => x.id === currentId);
+      const d = current();
       $("dDate").textContent = dinnerDate(d.starts_at);
       $("dTitle").textContent = d.title;
       $("dSub").textContent = d.subtitle || "";
-      $("dChefs").textContent = d.chefs ? "Chef: " + d.chefs : "";
+      $("dChefs").innerHTML = chefsOf(d).map((c) => `<span class="tag">${esc(c)}</span>`).join("");
       document.title = d.title + " · Einprosit";
     }
 
@@ -147,7 +160,7 @@
       const id = currentId;
       const { data, error } = await sb.rpc("list_requests", { p_dinner: id });
       if (id !== currentId) return;
-      if (error) { toast("Impossibile caricare le richieste", true); return; }
+      if (error) { toast("Couldn't load the requests", true); return; }
       renderRequests(data || []);
     }
 
@@ -157,13 +170,13 @@
       rows.forEach((r) => { c[r.status]++; if (r.status === "disponibile" && r.price != null) total += Number(r.price); });
       $("count").textContent = rows.length ? `(${rows.length})` : "";
       $("stats").innerHTML = `
-        <span class="stat"><b>${c.in_attesa}</b> in attesa</span>
-        <span class="stat"><b>${c.disponibile}</b> disponibili</span>
-        <span class="stat"><b>${c.non_disponibile}</b> non disponibili</span>
-        ${total ? `<span class="stat">Totale confermato <b>${price(total)}</b></span>` : ""}`;
+        <span class="stat"><b>${c.in_attesa}</b> pending</span>
+        <span class="stat"><b>${c.disponibile}</b> available</span>
+        <span class="stat"><b>${c.non_disponibile}</b> not available</span>
+        ${total ? `<span class="stat"><b>${price(total)}</b> confirmed total</span>` : ""}`;
 
       if (!rows.length) {
-        $("reqList").innerHTML = `<li class="empty">Ancora nessuna richiesta per questa cena. Inizia tu!</li>`;
+        $("reqList").innerHTML = `<li class="empty">No requests for this dinner yet.</li>`;
         return;
       }
       $("reqList").innerHTML = rows.map((r) => `
@@ -179,14 +192,34 @@
         </li>`).join("");
     }
 
-    // Nome chef ricordato su questo dispositivo
-    $("fChef").value = store.get("ep_chef_name", "");
+    // ---------- new request dialog ----------
+    const dlg = $("formDialog");
+
+    function openForm() {
+      const d = current();
+      const chefs = chefsOf(d);
+      const last = store.get("ep_chef_by_dinner", {})[d.id];
+      $("formDinner").textContent = d.title + " · " + dinnerDate(d.starts_at);
+      $("chefOptions").innerHTML = chefs.length
+        ? chefs.map((c, i) => `<label class="chef-opt"><input type="radio" name="chef" value="${esc(c)}" required ${c === last || (chefs.length === 1 && i === 0) ? "checked" : ""}><span>${esc(c)}</span></label>`).join("")
+        : `<span class="hint">No chefs listed for this dinner yet.</span>`;
+      if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+      setTimeout(() => (document.querySelector('input[name="chef"]:checked') ? $("fItem") : document.querySelector('input[name="chef"]') || $("fItem")).focus(), 50);
+    }
+    function closeForm() { dlg.close ? dlg.close() : dlg.removeAttribute("open"); }
+
+    $("openForm").addEventListener("click", openForm);
+    $("closeForm").addEventListener("click", closeForm);
+    $("cancelForm").addEventListener("click", closeForm);
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) closeForm(); });
 
     $("reqForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const chef = $("fChef").value.trim();
+      const picked = document.querySelector('input[name="chef"]:checked');
+      if (!picked) { toast("Select your name first", true); return; }
+      const chef = picked.value;
       const item = $("fItem").value.trim();
-      if (!chef || !item) return;
+      if (!item) return;
       $("fSubmit").disabled = true;
       const { error } = await sb.rpc("add_request", {
         p_dinner: currentId,
@@ -196,16 +229,16 @@
         p_notes: $("fNotes").value.trim() || null,
       });
       $("fSubmit").disabled = false;
-      if (error) { toast(error.message || "Errore nell'invio", true); return; }
-      store.set("ep_chef_name", chef);
+      if (error) { toast(error.message || "Couldn't send the request", true); return; }
+      const m = store.get("ep_chef_by_dinner", {}); m[currentId] = chef; store.set("ep_chef_by_dinner", m);
       $("fItem").value = ""; $("fQty").value = ""; $("fNotes").value = "";
-      $("fItem").focus();
-      toast("Richiesta inviata");
+      closeForm();
+      toast("Request sent");
       loadRequests();
     });
 
-    // Aggiornamento automatico
-    setInterval(() => { if (!document.hidden && currentId) loadRequests(); }, 20000);
+    // Auto refresh
+    setInterval(() => { if (!document.hidden && currentId && !dlg.open) loadRequests(); }, 20000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden && currentId) loadRequests(); });
 
     loadDinners();
