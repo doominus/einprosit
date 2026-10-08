@@ -129,6 +129,12 @@
       subscribe();
     }
 
+    const authErr = new URLSearchParams(location.hash.slice(1)).get("error_description");
+    if (authErr) {
+      setTimeout(() => toast(/expired|invalid/i.test(authErr) ? "This sign-in link has expired or was already used. Request a new one." : authErr, true), 300);
+      history.replaceState(null, "", location.pathname);
+    }
+
     let booted = false;
     sb.auth.onAuthStateChange((evt, session) => {
       if (evt === "INITIAL_SESSION" || (evt === "SIGNED_IN" && !booted)) {

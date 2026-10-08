@@ -12,6 +12,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css?v=3">
+  <script>
+    // Admin sign-in links may land on the homepage: forward them to the admin page.
+    (function () {
+      var h = location.hash || "", q = location.search || "";
+      if (/access_token=|error_description=|type=magiclink|type=signup/.test(h) || /[?&]code=/.test(q)) {
+        location.replace("admin.html" + q + h);
+      }
+    })();
+  </script>
 </head>
 <body>
 
