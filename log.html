@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#eeeef1">
+  <title>Einprosit · Activity log</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css?v=8">
+</head>
+<body>
+  <div id="loading" class="gate"><p style="color:var(--ink-3)">Loading…</p></div>
+
+  <div id="app" class="log-wrap hidden">
+    <main class="main">
+      <div class="topbar">
+        <a class="back-link" href="admin.html">← Back to admin</a>
+        <span id="who"></span>
+      </div>
+
+      <header class="log-head">
+        <div>
+          <h2>Activity log</h2>
+          <p class="sub">Every request created, edited or deleted — with what it looked like before. Only you can see this page, and the log can't be changed from the site.</p>
+        </div>
+        <div class="log-tools">
+          <button class="btn ghost small" id="refresh" type="button">Refresh</button>
+          <button class="btn small" id="exportCsv" type="button">Download CSV</button>
+        </div>
+      </header>
+
+      <div class="log-filters">
+        <div class="filters" id="actionFilters">
+          <button class="chip on" data-f="all">All</button>
+          <button class="chip" data-f="created">Created</button>
+          <button class="chip" data-f="edited">Edited</button>
+          <button class="chip" data-f="deleted">Deleted</button>
+          <button class="chip" data-f="restored">Restored</button>
+        </div>
+        <div class="log-selects">
+          <select id="dinnerFilter" aria-label="Dinner"><option value="">All dinners</option></select>
+          <input type="text" id="search" placeholder="Search chef, ingredient or IP" aria-label="Search">
+        </div>
+      </div>
+
+      <ul id="logList" class="log-list"></ul>
+      <p class="log-foot" id="logFoot"></p>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js?v=3"></script>
+  <script src="assets/common.js?v=3"></script>
+  <script>
+  (function () {
+    const { sb, esc, STATUS, toast, price } = window.EP;
+    const $ = (id) => document.getElementById(id);
+
+    const LABELS = { chef_name: "Chef", item: "Ingredient", quantity: "Quantity", notes: "Notes", status: "Status", price: "Price", admin_note: "Note for chef" };
+    const ACTIONS = { created: "Created", edited: "Edited", deleted: "Deleted", restored: "Restored", snapshot: "Backup start" };
+    const fmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Europe/Rome" });
+
+    let entries = [];
+    let dinners = {};
+    let filter = "all";
+
+    const show = (on) => { $("loading").classList.toggle("hidden", on); $("app").classList.toggle("hidden", !on); };
+
+    function val(k, v) {
+      if (v == null || v === "") return "—";
+      if (k === "status") return STATUS[v] || v;
+      if (k === "price") return price(v);
+      return String(v);
+    }
+
+    async function boot() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return location.replace("admin.html");
+      const { data: ok } = await sb.rpc("is_admin");
+      if (!ok) return location.replace("admin.html");
+      $("who").textContent = session.user.email;
+      show(true);
+      await load();
+    }
+
+    async function load() {
+      const [d, l] = await Promise.all([
+        sb.from("dinners").select("id,title,sort_order").order("sort_order"),
+        sb.from("request_log").select("*").order("id", { ascending: false }).limit(2000),
+      ]);
+      if (d.error || l.error) return toast("Couldn't load the log", true);
+      dinners = Object.fromEntries(d.data.map((x) => [x.id, x.title]));
+      const sel = $("dinnerFilter"), cur = sel.value;
+      sel.innerHTML = `<option value="">All dinners</option>` + d.data.map((x) => `<option value="${x.id}">${esc(x.title)}</option>`).join("");
+      sel.value = cur;
+      entries = l.data;
+      render();
+    }
+
+    function visible() {
+      const dn = $("dinnerFilter").value;
+      const q = $("search").value.trim().toLowerCase();
+      return entries.filter((e) => {
+        if (filter !== "all" && e.action !== filter) return false;
+        if (dn && e.dinner_id !== dn) return false;
+        if (q) {
+          const o = e.old_data || {}, n = e.new_data || {};
+          const hay = [o.chef_name, n.chef_name, o.item, n.item, e.actor, e.ip].join(" ").toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function changes(e) {
+      const o = e.old_data || {}, n = e.new_data || {};
+      if (e.action === "edited" || (e.action === "restored" && e.old_data)) {
+        const diff = Object.keys(LABELS).filter((k) => JSON.stringify(o[k] ?? null) !== JSON.stringify(n[k] ?? null));
+        if (!diff.length) return `<span class="muted">No visible change</span>`;
+        return diff.map((k) => `<span class="chg"><b>${LABELS[k]}</b> <s>${esc(val(k, o[k]))}</s> → <ins>${esc(val(k, n[k]))}</ins></span>`).join("");
+      }
+      const r = e.action === "deleted" ? o : n;
+      return ["quantity", "notes", "status", "price", "admin_note"]
+        .filter((k) => r[k] != null && r[k] !== "" && !(k === "status" && r[k] === "in_attesa"))
+        .map((k) => `<span class="chg"><b>${LABELS[k]}</b> ${esc(val(k, r[k]))}</span>`).join("");
+    }
+
+    function render() {
+      const rows = visible();
+      $("logFoot").textContent = `${rows.length} of ${entries.length} entries`;
+      if (!rows.length) { $("logList").innerHTML = `<li class="empty">Nothing here yet.</li>`; return; }
+      $("logList").innerHTML = rows.map((e) => {
+        const r = e.new_data || e.old_data || {};
+        const canRestore = (e.action === "deleted" || e.action === "edited") && e.old_data;
+        return `<li class="log-row ${e.action}">
+          <div class="log-main">
+            <span class="act ${e.action}">${ACTIONS[e.action] || e.action}</span>
+            <span class="tag">${esc(r.chef_name || "")}</span>
+            <span class="item">${esc(r.item || "")}</span>
+            <span class="log-dinner">${esc(dinners[e.dinner_id] || "Deleted dinner")}</span>
+            <span class="log-time">${esc(fmt.format(new Date(e.at)))}</span>
+          </div>
+          <div class="log-detail">${changes(e)}</div>
+          <div class="log-meta">
+            <span>by ${esc(e.actor)}${e.ip ? ` · <span class="ip" title="Device network address">IP ${esc(e.ip)}</span>` : ""}</span>
+            ${canRestore ? `<button class="btn ghost small" data-restore="${e.id}" type="button">${e.action === "deleted" ? "Restore request" : "Undo this edit"}</button>` : ""}
+          </div>
+        </li>`;
+      }).join("");
+    }
+
+    $("actionFilters").addEventListener("click", (e) => {
+      const c = e.target.closest(".chip"); if (!c) return;
+      filter = c.dataset.f;
+      document.querySelectorAll("#actionFilters .chip").forEach((x) => x.classList.toggle("on", x === c));
+      render();
+    });
+    $("dinnerFilter").addEventListener("change", render);
+    $("search").addEventListener("input", render);
+    $("refresh").addEventListener("click", () => load().then(() => toast("Updated")));
+
+    $("logList").addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-restore]"); if (!b) return;
+      const entry = entries.find((x) => String(x.id) === b.dataset.restore);
+      const what = entry.action === "deleted" ? "restore this deleted request" : "put this request back as it was before the edit";
+      if (!confirm(`Do you want to ${what}?`)) return;
+      b.disabled = true;
+      const { error } = await sb.rpc("admin_restore", { p_log_id: entry.id });
+      b.disabled = false;
+      if (error) return toast(error.message, true);
+      toast("Restored");
+      load();
+    });
+
+    $("exportCsv").addEventListener("click", () => {
+      const cols = ["time", "action", "dinner", "by", "chef", "ingredient", "quantity", "notes", "status", "price", "note_for_chef", "before", "ip"];
+      const q = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
+      const lines = [cols.join(",")].concat(visible().map((e) => {
+        const r = e.new_data || e.old_data || {};
+        const before = e.action === "edited" && e.old_data
+          ? Object.keys(LABELS).filter((k) => JSON.stringify(e.old_data[k] ?? null) !== JSON.stringify((e.new_data || {})[k] ?? null)).map((k) => `${LABELS[k]}: ${val(k, e.old_data[k])}`).join("; ")
+          : "";
+        return [fmt.format(new Date(e.at)), ACTIONS[e.action] || e.action, dinners[e.dinner_id] || "", e.actor, r.chef_name, r.item, r.quantity, r.notes,
+          STATUS[r.status] || r.status, r.price, r.admin_note, before, e.ip].map(q).join(",");
+      }));
+      const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `einprosit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+
+    setInterval(() => { if (!document.hidden) load(); }, 30000);
+    boot();
+  })();
+  </script>
+</body>
+</html>
