@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=20">
+  <link rel="stylesheet" href="assets/style.css?v=22">
 </head>
 <body>
 
@@ -88,10 +88,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=11"></script>
+  <script src="assets/common.js?v=13"></script>
   <script>
   (function () {
-    const { sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle, photoUrl, QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, billedQty, lineTotalMin, parseQty, toNum, fmtNum } = window.EP;
+    const { sb, esc, dinnerDate, STATUS, isPending, toast, shortDate, price, setChefColors, chefStyle, photoUrl, QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, billedQty, lineTotalMin, parseQty, toNum, fmtNum } = window.EP;
     const $ = (id) => document.getElementById(id);
     const views = ["loading", "login", "denied", "app"];
     const show = (id) => views.forEach((v) => $(v).classList.toggle("hidden", v !== id));
@@ -213,7 +213,7 @@
       // Don't redraw while a request has unsaved changes or is being typed in
       const list = $("reqList");
       const busy = list.querySelector(".req[data-dirty]") || document.activeElement?.closest("#reqList .req");
-      const rows = mine.filter((r) => filter === "all" || r.status === filter);
+      const rows = mine.filter((r) => filter === "all" || (filter === "in_attesa" ? isPending(r.status) : r.status === filter));
       if (busy && list.dataset.dinner === currentId) return;
       list.dataset.dinner = currentId;
       if (!rows.length) {

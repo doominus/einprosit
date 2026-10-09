@@ -29,9 +29,14 @@
 
   const STATUS = {
     in_attesa: "Pending",
+    da_verificare: "Pending · Check product",
+    quantita_parziale: "Pending · Not full quantity",
     disponibile: "Available",
     non_disponibile: "Not available",
   };
+
+  // "Check product" and "Not full quantity" are still pending, with a reason
+  const isPending = (st) => st === "in_attesa" || st === "da_verificare" || st === "quantita_parziale";
 
   let toastTimer;
   function toast(msg, isErr) {
@@ -129,7 +134,7 @@
   window.EP = {
     QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, billedQty, lineTotalMin, parseQty, toNum, fmtNum: (n) => (n == null ? "" : numFmt.format(Number(n))),
     setChefColors, chefStyle, photoUrl,
-    sb, esc, dinnerDate, STATUS, toast, store,
+    sb, esc, dinnerDate, STATUS, isPending, toast, store,
     shortDate: (ts) => (ts ? shortFmt.format(new Date(ts)) : ""),
     price: (n) => (n == null ? "" : priceFmt.format(Number(n))),
   };

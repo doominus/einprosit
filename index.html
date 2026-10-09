@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=20">
+  <link rel="stylesheet" href="assets/style.css?v=22">
   <script>
     // Admin sign-in links may land on the homepage: forward them to the admin page.
     (function () {
@@ -99,10 +99,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=11"></script>
+  <script src="assets/common.js?v=13"></script>
   <script>
   (function () {
-    const { lineTotal, lineTotalMin, billedQty, PRICE_SUFFIX, fmtNum, sb, esc, dinnerDate, STATUS, toast, store, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
+    const { lineTotal, lineTotalMin, billedQty, PRICE_SUFFIX, fmtNum, sb, esc, dinnerDate, STATUS, isPending, toast, store, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
     const $ = (id) => document.getElementById(id);
 
     let dinners = [];
@@ -259,7 +259,7 @@
       $("fItem").value = editing ? editing.item : "";
       $("fQty").value = editing ? editing.quantity || "" : "";
       $("fNotes").value = editing ? editing.notes || "" : "";
-      $("editHint").classList.toggle("hidden", !(editing && editing.status !== "in_attesa"));
+      $("editHint").classList.toggle("hidden", !(editing && !isPending(editing.status)));
       $("formDinner").textContent = d.title + " · " + dinnerDate(d.starts_at);
       $("chefOptions").innerHTML = chefs.length
         ? chefs.map((c, i) => `<label class="chef-opt" style="${chefStyle(c)}"><input type="radio" name="chef" value="${esc(c)}" required ${c === last || (chefs.length === 1 && i === 0) ? "checked" : ""}><span>${esc(c)}</span></label>`).join("")
