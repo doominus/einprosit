@@ -1,5 +1,16 @@
 (function () {
-  const sb = window.supabase.createClient(window.EP_CONFIG.supabaseUrl, window.EP_CONFIG.supabaseKey);
+  // Lock only within this tab: the default cross-tab lock can get stuck when the
+  // admin page is open in several tabs, and then uploads/saves wait forever.
+  const tabLocks = {};
+  const tabLock = (name, _timeout, fn) => {
+    const prev = tabLocks[name] || Promise.resolve();
+    const run = prev.catch(() => {}).then(() => fn());
+    tabLocks[name] = run.catch(() => {});
+    return run;
+  };
+  const sb = window.supabase.createClient(window.EP_CONFIG.supabaseUrl, window.EP_CONFIG.supabaseKey, {
+    auth: { lock: tabLock },
+  });
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
