@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=19">
+  <link rel="stylesheet" href="assets/style.css?v=20">
 </head>
 <body>
 
@@ -61,11 +61,6 @@
         <h2 id="dTitle"></h2>
         <p class="sub" id="dSub"></p>
         <div class="chef-tags" id="dChefs"></div>
-        <div class="stats" id="stats"></div>
-        <div class="chef-split-wrap">
-          <div class="chef-split-head"><h3>By chef</h3><span class="hint">Confirmed items · tap a chef to see only theirs</span></div>
-          <div class="chef-split" id="chefSplit"></div>
-        </div>
       </header>
 
       <h3 class="section-title">Requests</h3>
@@ -75,7 +70,6 @@
         <button class="chip" data-f="disponibile">Available</button>
         <button class="chip" data-f="non_disponibile">Not available</button>
       </div>
-      <div class="filter-note" id="chefNote"></div>
       <ul id="reqList" class="req-list"></ul>
 
       <h3 class="section-title">Dinner details</h3>
@@ -94,10 +88,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=10"></script>
+  <script src="assets/common.js?v=11"></script>
   <script>
   (function () {
-    const { chefSplit, sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle, photoUrl, QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, billedQty, lineTotalMin, parseQty, toNum, fmtNum } = window.EP;
+    const { sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle, photoUrl, QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, billedQty, lineTotalMin, parseQty, toNum, fmtNum } = window.EP;
     const $ = (id) => document.getElementById(id);
     const views = ["loading", "login", "denied", "app"];
     const show = (id) => views.forEach((v) => $(v).classList.toggle("hidden", v !== id));
@@ -106,7 +100,6 @@
     let requests = [];
     let currentId = null;
     let filter = "all";
-    let chefFilter = null;
     let channel = null;
 
     // ---------- auth ----------
@@ -195,10 +188,9 @@
       history.replaceState(null, "", "#d=" + d.id);
 
       $("dinnerList").innerHTML = dinners.map((x) => {
-        const pending = requests.filter((r) => r.dinner_id === x.id && r.status === "in_attesa").length;
         return `<li><button class="dinner-btn ${x.id === currentId ? "active" : ""}" data-id="${x.id}">
           <span class="d-date">${esc(dinnerDate(x.starts_at))}</span>
-          <span class="d-title">${esc(x.title)}${pending ? `<span class="badge">${pending}</span>` : ""}</span>
+          <span class="d-title">${esc(x.title)}</span>
           ${x.subtitle ? `<span class="d-sub">${esc(x.subtitle)}</span>` : ""}
         </button></li>`;
       }).join("");
@@ -217,25 +209,12 @@
       }
 
       const mine = requests.filter((r) => r.dinner_id === currentId);
-      const c = { in_attesa: 0, disponibile: 0, non_disponibile: 0 };
-      let total = 0;
-      mine.forEach((r) => { c[r.status]++; if (r.status === "disponibile" && r.price != null) total += Number(r.price); });
-      $("stats").innerHTML = `
-        <span class="stat"><b>${c.in_attesa}</b> pending</span>
-        <span class="stat"><b>${c.disponibile}</b> available</span>
-        <span class="stat"><b>${c.non_disponibile}</b> not available</span>
-        <span class="stat"><b>${price(total)}</b> confirmed total</span>`;
-
-      const chefList = (d.chefs || "").split(",").map((c) => c.trim()).filter(Boolean);
-      $("chefSplit").innerHTML = chefSplit(mine, chefList, chefFilter);
 
       // Don't redraw while a request has unsaved changes or is being typed in
       const list = $("reqList");
       const busy = list.querySelector(".req[data-dirty]") || document.activeElement?.closest("#reqList .req");
-      const rows = mine.filter((r) => (filter === "all" || r.status === filter) && (!chefFilter || r.chef_name.toLowerCase() === chefFilter.toLowerCase()));
-      $("chefNote").innerHTML = chefFilter ? `Showing only <b>${esc(chefFilter)}</b> <button type="button" data-clear-chef>Show all chefs</button>` : "";
-      if (busy && list.dataset.dinner === currentId && list.dataset.chef === (chefFilter || "")) return;
-      list.dataset.chef = chefFilter || "";
+      const rows = mine.filter((r) => filter === "all" || r.status === filter);
+      if (busy && list.dataset.dinner === currentId) return;
       list.dataset.dinner = currentId;
       if (!rows.length) {
         list.innerHTML = `<li class="empty">No requests${filter !== "all" ? " with this status" : ""}.</li>`;
@@ -391,20 +370,10 @@
       if (document.querySelector(".req[data-dirty]") && !confirm("You have unsaved changes. Leave them?")) return;
       document.querySelectorAll(".req[data-dirty]").forEach((x) => delete x.dataset.dirty);
       currentId = b.dataset.id;
-      chefFilter = null;
       document.activeElement?.blur();
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
-
-    function setChefFilter(name) {
-      if (document.querySelector(".req[data-dirty]") && !confirm("You have unsaved changes. Leave them?")) return;
-      document.querySelectorAll(".req[data-dirty]").forEach((x) => delete x.dataset.dirty);
-      chefFilter = chefFilter && name && chefFilter.toLowerCase() === name.toLowerCase() ? null : name;
-      render();
-    }
-    $("chefSplit").addEventListener("click", (e) => { const c = e.target.closest(".chef-card"); if (c) setChefFilter(c.dataset.chef); });
-    $("chefNote").addEventListener("click", (e) => { if (e.target.closest("[data-clear-chef]")) setChefFilter(null); });
 
     $("filters").addEventListener("click", (e) => {
       const c = e.target.closest(".chip");

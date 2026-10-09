@@ -126,28 +126,7 @@
     return { amount: toNum(m[1]), unit };
   }
 
-  // Per-chef accounting: each chef is responsible for their own confirmed items.
-  function chefSplit(rows, chefList, active) {
-    const names = [...chefList];
-    rows.forEach((r) => { if (!names.some((n) => key(n) === key(r.chef_name))) names.push(r.chef_name); });
-    if (!names.length) return "";
-    const priceFmtL = (n) => priceFmt.format(n);
-    return names.map((n) => {
-      const mine = rows.filter((r) => key(r.chef_name) === key(n));
-      const conf = mine.filter((r) => r.status === "disponibile");
-      const total = conf.reduce((a, r) => a + (r.price != null ? Number(r.price) : 0), 0);
-      const pending = mine.filter((r) => r.status === "in_attesa").length;
-      const missing = conf.filter((r) => r.price == null).length;
-      return `<button type="button" class="chef-card ${key(active) === key(n) ? "on" : ""}" data-chef="${esc(n)}" style="${chefStyle(n)}">
-        <span class="cc-name">${esc(n)}</span>
-        <span class="cc-total">${priceFmtL(total)}</span>
-        <span class="cc-meta">${mine.length} request${mine.length === 1 ? "" : "s"} · ${conf.length} confirmed${pending ? ` · ${pending} pending` : ""}${missing ? ` · ${missing} without price` : ""}</span>
-      </button>`;
-    }).join("");
-  }
-
   window.EP = {
-    chefSplit,
     QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, billedQty, lineTotalMin, parseQty, toNum, fmtNum: (n) => (n == null ? "" : numFmt.format(Number(n))),
     setChefColors, chefStyle, photoUrl,
     sb, esc, dinnerDate, STATUS, toast, store,
