@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=13">
+  <link rel="stylesheet" href="assets/style.css?v=16">
 </head>
 <body>
 
@@ -62,6 +62,10 @@
         <p class="sub" id="dSub"></p>
         <div class="chef-tags" id="dChefs"></div>
         <div class="stats" id="stats"></div>
+        <div class="chef-split-wrap">
+          <div class="chef-split-head"><h3>By chef</h3><span class="hint">Confirmed items · tap a chef to see only theirs</span></div>
+          <div class="chef-split" id="chefSplit"></div>
+        </div>
       </header>
 
       <h3 class="section-title">Requests</h3>
@@ -71,6 +75,7 @@
         <button class="chip" data-f="disponibile">Available</button>
         <button class="chip" data-f="non_disponibile">Not available</button>
       </div>
+      <div class="filter-note" id="chefNote"></div>
       <ul id="reqList" class="req-list"></ul>
 
       <h3 class="section-title">Dinner details</h3>
@@ -89,10 +94,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=5"></script>
+  <script src="assets/common.js?v=7"></script>
   <script>
   (function () {
-    const { sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
+    const { chefSplit, sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle, photoUrl, QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, parseQty, toNum, fmtNum } = window.EP;
     const $ = (id) => document.getElementById(id);
     const views = ["loading", "login", "denied", "app"];
     const show = (id) => views.forEach((v) => $(v).classList.toggle("hidden", v !== id));
@@ -101,6 +106,7 @@
     let requests = [];
     let currentId = null;
     let filter = "all";
+    let chefFilter = null;
     let channel = null;
 
     // ---------- auth ----------
@@ -220,22 +226,34 @@
         <span class="stat"><b>${c.non_disponibile}</b> not available</span>
         <span class="stat"><b>${price(total)}</b> confirmed total</span>`;
 
+      const chefList = (d.chefs || "").split(",").map((c) => c.trim()).filter(Boolean);
+      $("chefSplit").innerHTML = chefSplit(mine, chefList, chefFilter);
+
       // Don't redraw while a request has unsaved changes or is being typed in
       const list = $("reqList");
       const busy = list.querySelector(".req[data-dirty]") || document.activeElement?.closest("#reqList .req");
-      const rows = mine.filter((r) => filter === "all" || r.status === filter);
-      if (busy && list.dataset.dinner === currentId) return;
+      const rows = mine.filter((r) => (filter === "all" || r.status === filter) && (!chefFilter || r.chef_name.toLowerCase() === chefFilter.toLowerCase()));
+      $("chefNote").innerHTML = chefFilter ? `Showing only <b>${esc(chefFilter)}</b> <button type="button" data-clear-chef>Show all chefs</button>` : "";
+      if (busy && list.dataset.dinner === currentId && list.dataset.chef === (chefFilter || "")) return;
+      list.dataset.chef = chefFilter || "";
       list.dataset.dinner = currentId;
       if (!rows.length) {
         list.innerHTML = `<li class="empty">No requests${filter !== "all" ? " with this status" : ""}.</li>`;
         return;
       }
       list.innerHTML = rows.map(requestCard).join("");
+      list.querySelectorAll(".req").forEach((li) => { if (li.querySelector(".offer")) updateTotal(li); });
     }
 
-    function offerLine(o) {
+    const decIn = (n) => (n == null ? "" : String(Number(n)).replace(".", ","));
+    const opts = (map, cur) => Object.entries(map).map(([k, v]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${v}</option>`).join("");
+
+    function offerLine(o, req) {
       o = o || {};
+      if (!o.id && req) { const q = parseQty(req.quantity); o = { qty_amount: q.amount, qty_unit: q.unit, price_unit: q.unit }; }
       const url = photoUrl(o.photo_path);
+      const qtyUnit = o.qty_unit || "kg";
+      const priceUnit = o.price_unit || (o.id ? "total" : qtyUnit);
       return `<div class="offer" data-offer="${esc(o.id || "")}">
         <label class="offer-photo" title="${url ? "Change photo" : "Add a photo"}">
           <input type="file" accept="image/*" data-k="photo" hidden>
@@ -245,13 +263,22 @@
         <div class="offer-fields">
           <input type="text" data-k="supplier" maxlength="120" value="${esc(o.supplier || "")}" placeholder="Supplier" aria-label="Supplier">
           <input type="text" data-k="product" maxlength="160" value="${esc(o.product || "")}" placeholder="Product / brand" aria-label="Product">
-          <input type="text" data-k="quantity" maxlength="60" value="${esc(o.quantity || "")}" placeholder="Qty" aria-label="Quantity">
-          <input type="text" data-k="price" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" value="${o.price != null ? String(o.price).replace(".", ",") : ""}" placeholder="€ 0,00" aria-label="Price">
+          <div class="unit-field">
+            <input type="text" data-k="qty_amount" inputmode="decimal" value="${decIn(o.qty_amount)}" placeholder="Qty" aria-label="Quantity">
+            <select data-k="qty_unit" aria-label="Quantity unit">${opts(QTY_UNITS, qtyUnit)}</select>
+          </div>
+          <div class="unit-field">
+            <input type="text" data-k="price" inputmode="decimal" value="${decIn(o.price)}" placeholder="€ 0,00" aria-label="Price">
+            <select data-k="price_unit" aria-label="Price is">${opts(PRICE_UNITS, priceUnit)}</select>
+          </div>
           <input type="text" data-k="note" maxlength="500" value="${esc(o.note || "")}" placeholder="Note (visible to chefs)" aria-label="Line note" class="offer-note">
         </div>
-        <label class="offer-pick" title="Chosen: counts in the total">
-          <input type="checkbox" data-k="selected" ${o.selected ? "checked" : ""}><span>Chosen</span>
-        </label>
+        <div class="offer-side">
+          <span class="line-total" data-line-total></span>
+          <label class="offer-pick" title="Chosen: counts in the total">
+            <input type="checkbox" data-k="selected" ${o.selected ? "checked" : ""}><span>Chosen</span>
+          </label>
+        </div>
         <button type="button" class="row-btn danger" data-act="rm-line" aria-label="Remove line" title="Remove line">×</button>
       </div>`;
     }
@@ -268,7 +295,7 @@
 
         <div class="offers-box">
           <div class="offers-head"><span>Suppliers &amp; prices</span><span class="hint">Tick "Chosen" on the lines you'll buy — their prices make the total.</span></div>
-          <div class="offers">${offers.map(offerLine).join("")}</div>
+          <div class="offers">${offers.map((o) => offerLine(o)).join("")}</div>
           <button type="button" class="btn ghost small" data-act="add-line">+ Add line</button>
         </div>
 
@@ -294,21 +321,33 @@
     function readOffers(li) {
       return [...li.querySelectorAll(".offer")].map((el) => {
         const v = (k) => el.querySelector(`[data-k="${k}"]`);
-        const pr = v("price").value.replace(/\s|€/g, "").replace(",", ".");
         return {
           id: el.dataset.offer || null,
-          supplier: v("supplier").value, product: v("product").value, quantity: v("quantity").value,
-          price: pr === "" ? null : pr, note: v("note").value,
-          photo_path: v("photo_path").value || null, selected: v("selected").checked,
+          supplier: v("supplier").value, product: v("product").value,
+          qty_amount: toNum(v("qty_amount").value), qty_unit: v("qty_unit").value,
+          price: toNum(v("price").value), price_unit: v("price_unit").value,
+          note: v("note").value, photo_path: v("photo_path").value || null, selected: v("selected").checked,
         };
-      }).filter((o) => o.id || o.supplier.trim() || o.product.trim() || o.quantity.trim() || o.price != null || o.note.trim() || o.photo_path);
+      }).filter((o) => o.id || o.supplier.trim() || o.product.trim() || o.qty_amount != null || o.price != null || o.note.trim() || o.photo_path);
     }
 
+    // per-line "= €xx" and the request total, same maths as the database
     function updateTotal(li) {
       const offers = readOffers(li);
-      const chosen = offers.filter((o) => o.selected);
-      const use = chosen.length ? chosen : offers.length === 1 ? offers : [];
-      const nums = use.filter((o) => o.price != null).map((o) => Number(o.price)).filter((n) => !isNaN(n) && n >= 0);
+      li.querySelectorAll(".offer").forEach((el) => {
+        const v = (k) => el.querySelector(`[data-k="${k}"]`).value;
+        const pr = toNum(v("price")), q = toNum(v("qty_amount")), pu = v("price_unit"), qu = v("qty_unit");
+        const t = lineTotal(pr, pu, q, qu);
+        const out = el.querySelector("[data-line-total]");
+        out.classList.toggle("warn", pr != null && t == null);
+        out.textContent = pr == null ? "" : t != null
+          ? (pu === "total" ? "= " + price(t) : `${fmtNum(q)} ${qu} × ${price(pr)}${PRICE_SUFFIX[pu]} = ${price(t)}`)
+          : (q == null ? "Add the quantity" : "Units don't match");
+      });
+      const totals = offers.map((o) => ({ ...o, t: lineTotal(o.price, o.price_unit, o.qty_amount, o.qty_unit) }));
+      const chosen = totals.filter((o) => o.selected);
+      const use = chosen.length ? chosen : totals.length === 1 ? totals : [];
+      const nums = use.map((o) => o.t).filter((n) => n != null);
       li.querySelector("[data-total]").textContent = nums.length ? price(nums.reduce((a, b) => a + b, 0)) : "—";
     }
 
@@ -340,10 +379,20 @@
       if (document.querySelector(".req[data-dirty]") && !confirm("You have unsaved changes. Leave them?")) return;
       document.querySelectorAll(".req[data-dirty]").forEach((x) => delete x.dataset.dirty);
       currentId = b.dataset.id;
+      chefFilter = null;
       document.activeElement?.blur();
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
+
+    function setChefFilter(name) {
+      if (document.querySelector(".req[data-dirty]") && !confirm("You have unsaved changes. Leave them?")) return;
+      document.querySelectorAll(".req[data-dirty]").forEach((x) => delete x.dataset.dirty);
+      chefFilter = chefFilter && name && chefFilter.toLowerCase() === name.toLowerCase() ? null : name;
+      render();
+    }
+    $("chefSplit").addEventListener("click", (e) => { const c = e.target.closest(".chef-card"); if (c) setChefFilter(c.dataset.chef); });
+    $("chefNote").addEventListener("click", (e) => { if (e.target.closest("[data-clear-chef]")) setChefFilter(null); });
 
     $("filters").addEventListener("click", (e) => {
       const c = e.target.closest(".chip");
@@ -371,7 +420,8 @@
       }
 
       if (btn.dataset.act === "add-line") {
-        btn.previousElementSibling.insertAdjacentHTML("beforeend", offerLine());
+        btn.previousElementSibling.insertAdjacentHTML("beforeend", offerLine(null, requests.find((r) => r.id === id)));
+        updateTotal(li);
         btn.previousElementSibling.lastElementChild.querySelector('[data-k="supplier"]').focus();
         markDirty(li);
         return;
@@ -386,10 +436,11 @@
       const status = li.querySelector('[data-k="status"]').value;
       const note = li.querySelector('[data-k="admin_note"]').value.trim();
       if (li.querySelector(".offer.uploading")) return toast("Wait for the photo to finish uploading", true);
-      const bad = readOffers(li).find((o) => o.price != null && !/^\d+(\.\d{1,2})?$/.test(o.price));
-      if (bad) return toast(`Check the price "${bad.price}" — use a number like 12,50`, true);
+      const offersToSave = readOffers(li);
+      const bad = offersToSave.find((o) => (o.price != null && (isNaN(o.price) || o.price < 0)) || (o.qty_amount != null && (isNaN(o.qty_amount) || o.qty_amount < 0)));
+      if (bad) return toast("Check the numbers — use something like 12,50", true);
       btn.disabled = true;
-      const { error } = await sb.rpc("admin_save_request", { p_id: id, p_status: status, p_admin_note: note, p_offers: readOffers(li) });
+      const { error } = await sb.rpc("admin_save_request", { p_id: id, p_status: status, p_admin_note: note, p_offers: offersToSave });
       btn.disabled = false;
       btn.blur();
       if (error) return toast(error.message, true);
@@ -401,13 +452,13 @@
     $("reqList").addEventListener("input", (e) => {
       const li = e.target.closest(".req"); if (!li) return;
       markDirty(li);
-      if (e.target.matches('[data-k="price"], [data-k="selected"]')) updateTotal(li);
+      if (e.target.closest(".offer")) updateTotal(li);
     });
 
     $("reqList").addEventListener("change", async (e) => {
       const li = e.target.closest(".req"); if (!li) return;
       markDirty(li);
-      if (e.target.matches('[data-k="selected"]')) updateTotal(li);
+      if (e.target.closest(".offer")) updateTotal(li);
       if (!e.target.matches('[data-k="photo"]') || !e.target.files[0]) return;
       const line = e.target.closest(".offer");
       const box = line.querySelector(".offer-photo");

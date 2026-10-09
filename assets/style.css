@@ -359,6 +359,39 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 .offer-view .ov-price { font-weight: 600; font-variant-numeric: tabular-nums; }
 .offer-view .ov-chosen { font-size: 11px; color: var(--ok); font-weight: 600; }
 
+/* ---------- per-chef accounting ---------- */
+.chef-split-wrap { margin-top: 22px; }
+.chef-split-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.chef-split-head h3 { white-space: nowrap; }
+.chef-split-head h3 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -.2px; }
+.chef-split-head .hint { margin: 0; }
+.chef-split { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.chef-card {
+  text-align: left; border: 1px solid var(--line); background: var(--card); border-radius: var(--r-md);
+  padding: 10px 12px; display: grid; gap: 2px; cursor: pointer; border-top: 3px solid var(--tag-fg, var(--line));
+  transition: background .15s, box-shadow .15s;
+}
+.chef-card:hover { background: var(--surface); }
+.chef-card.on { background: var(--tag-bg, var(--surface)); box-shadow: 0 0 0 2px var(--tag-fg, var(--ink)) inset; }
+.chef-card .cc-name { font-size: 13px; font-weight: 600; color: var(--tag-fg, var(--ink)); }
+.chef-card .cc-total { font-size: 20px; font-weight: 600; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.chef-card .cc-meta { font-size: 11px; color: var(--ink-3); }
+.filter-note { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); margin: -4px 0 10px; }
+.filter-note button { border: 0; background: var(--surface); border-radius: var(--r-pill); padding: 3px 10px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
+
+/* ---------- units in admin lines ---------- */
+.offer-fields { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.offer-fields [data-k=supplier], .offer-fields [data-k=product] { grid-column: span 3; }
+.offer-fields .unit-field, .offer-fields .offer-note { grid-column: span 2; }
+.unit-field select { max-width: 92px; }
+.unit-field { display: flex; min-width: 0; }
+.unit-field input { flex: 1 1 0; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.unit-field select { flex: none; width: auto; padding: 7px 6px; font-size: 13px; border-radius: 0 8px 8px 0; border-left: 0; background: var(--surface); color: var(--ink-2); }
+.offer-side { display: grid; justify-items: end; gap: 6px; min-width: 120px; }
+.line-total { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; text-align: right; }
+.line-total.warn { color: var(--no); }
+.offer-view .ov-calc { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
 /* ---------- mobile ---------- */
 @media (max-width: 860px) {
   .app { grid-template-columns: 1fr; padding: 10px; gap: 10px; }
@@ -405,8 +438,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
   .offer { grid-template-columns: 56px 1fr auto; }
   .offer-photo { width: 56px; height: 56px; }
   .offer-fields { grid-template-columns: 1fr 1fr; grid-column: 2 / -1; }
-  .offer-fields [data-k=supplier], .offer-fields [data-k=product] { grid-column: 1 / -1; }
-  .offer-pick { grid-column: 1 / 3; }
+  .offer-fields [data-k=supplier], .offer-fields [data-k=product], .offer-fields .unit-field { grid-column: 1 / -1; }
+  .offer-side { grid-column: 1 / 3; justify-items: start; min-width: 0; }
+  .offer-side .line-total { text-align: left; }
+  .chef-split { grid-template-columns: 1fr 1fr; }
   .offer > .row-btn { grid-column: 3; grid-row: 2; justify-self: end; }
   .req-total { justify-items: start; }
   .admin-controls .note-field { grid-column: 1 / -1; }

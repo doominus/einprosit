@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=13">
+  <link rel="stylesheet" href="assets/style.css?v=16">
   <script>
     // Admin sign-in links may land on the homepage: forward them to the admin page.
     (function () {
@@ -53,12 +53,17 @@
         <p class="sub" id="dSub"></p>
         <div class="chef-tags" id="dChefs"></div>
         <div class="stats" id="stats"></div>
+        <div class="chef-split-wrap">
+          <div class="chef-split-head"><h3>By chef</h3><span class="hint">Confirmed items · tap a chef to see only theirs</span></div>
+          <div class="chef-split" id="chefSplit"></div>
+        </div>
       </header>
 
       <div class="list-head">
         <h3 class="section-title">Requests <span id="count" style="color:var(--ink-3);font-weight:500"></span></h3>
         <button class="btn" type="button" id="openForm"><span aria-hidden="true">+</span> New request</button>
       </div>
+      <div class="filter-note" id="chefNote"></div>
       <ul id="reqList" class="req-list"></ul>
     </main>
   </div>
@@ -100,14 +105,16 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=5"></script>
+  <script src="assets/common.js?v=7"></script>
   <script>
   (function () {
-    const { sb, esc, dinnerDate, STATUS, toast, store, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
+    const { chefSplit, lineTotal, PRICE_SUFFIX, fmtNum, sb, esc, dinnerDate, STATUS, toast, store, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
     const $ = (id) => document.getElementById(id);
 
     let dinners = [];
     let currentId = null;
+    let chefFilter = null;
+    let lastRows = [];
 
     const show = (id) => ["gate", "loading", "app"].forEach((x) => $(x).classList.toggle("hidden", x !== id));
     const hashDinner = () => new URLSearchParams(location.hash.slice(1)).get("d");
@@ -125,6 +132,7 @@
 
     function select(id, initial) {
       const d = dinners.find((x) => x.id === id) || dinners[0];
+      if (d.id !== currentId) chefFilter = null;
       currentId = d.id;
       if (hashDinner() !== d.id) history.replaceState(null, "", "#d=" + d.id);
       renderSidebar();
@@ -147,6 +155,13 @@
         </button></li>`;
       }).join("");
     }
+
+    function setChefFilter(name) {
+      chefFilter = chefFilter && name && chefFilter.toLowerCase() === name.toLowerCase() ? null : name;
+      renderRequests(lastRows);
+    }
+    $("chefSplit").addEventListener("click", (e) => { const c = e.target.closest(".chef-card"); if (c) setChefFilter(c.dataset.chef); });
+    $("chefNote").addEventListener("click", (e) => { if (e.target.closest("[data-clear-chef]")) setChefFilter(null); });
 
     $("dinnerList").addEventListener("click", (e) => {
       const b = e.target.closest(".dinner-btn");
@@ -178,25 +193,33 @@
     let rowsById = {};
     function offerView(o) {
       const url = photoUrl(o.photo_path);
-      const title = [o.product, o.quantity].filter(Boolean).join(" · ");
+      const qty = o.qty_amount != null ? `${fmtNum(o.qty_amount)} ${o.qty_unit || ""}`.trim() : o.quantity;
+      const title = [o.product, qty].filter(Boolean).join(" · ");
+      const t = o.line_total != null ? o.line_total : lineTotal(o.price, o.price_unit, o.qty_amount, o.qty_unit);
+      const calc = o.price != null && o.price_unit && o.price_unit !== "total" ? `${price(o.price)}${PRICE_SUFFIX[o.price_unit]}` : "";
       return `<div class="offer-view ${o.selected ? "chosen" : ""}">
         ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" title="Open photo"><img src="${esc(url)}" alt="${esc(o.product || "Product photo")}" loading="lazy"></a>` : ""}
         <div class="ov-main">
           ${title ? `<b>${esc(title)}</b>` : `<b>Option</b>`}
+          ${calc ? `<div class="ov-calc">${esc(calc)}</div>` : ""}
           ${o.note ? `<div class="ov-note">${esc(o.note)}</div>` : ""}
         </div>
         ${o.selected ? `<span class="ov-chosen">Chosen</span>` : ""}
-        ${o.price != null ? `<span class="ov-price">${price(o.price)}</span>` : ""}
+        ${t != null ? `<span class="ov-price">${price(t)}</span>` : o.price != null ? `<span class="ov-price">${price(o.price)}</span>` : ""}
       </div>`;
     }
 
-    function renderRequests(rows) {
+    function renderRequests(all) {
+      lastRows = all;
+      $("chefSplit").innerHTML = chefSplit(all, chefsOf(current()), chefFilter);
+      $("chefNote").innerHTML = chefFilter ? `Showing only <b>${esc(chefFilter)}</b> <button type="button" data-clear-chef>Show all chefs</button>` : "";
+      const rows = chefFilter ? all.filter((r) => r.chef_name.toLowerCase() === chefFilter.toLowerCase()) : all;
       const openRows = new Set([...document.querySelectorAll(".req-row.open")].map((x) => x.dataset.id));
       rowsById = Object.fromEntries(rows.map((r) => [r.id, r]));
       const c = { in_attesa: 0, disponibile: 0, non_disponibile: 0 };
       let total = 0;
-      rows.forEach((r) => { c[r.status]++; if (r.status === "disponibile" && r.price != null) total += Number(r.price); });
-      $("count").textContent = rows.length ? `(${rows.length})` : "";
+      all.forEach((r) => { c[r.status]++; if (r.status === "disponibile" && r.price != null) total += Number(r.price); });
+      $("count").textContent = all.length ? `(${rows.length !== all.length ? rows.length + " of " : ""}${all.length})` : "";
       $("stats").innerHTML = `
         <span class="stat"><b>${c.in_attesa}</b> pending</span>
         <span class="stat"><b>${c.disponibile}</b> available</span>
@@ -204,7 +227,7 @@
         ${total ? `<span class="stat"><b>${price(total)}</b> confirmed total</span>` : ""}`;
 
       if (!rows.length) {
-        $("reqList").innerHTML = `<li class="empty">No requests for this dinner yet.</li>`;
+        $("reqList").innerHTML = `<li class="empty">${chefFilter ? "No requests from this chef yet." : "No requests for this dinner yet."}</li>`;
         return;
       }
       $("reqList").innerHTML = rows.map((r) => `
