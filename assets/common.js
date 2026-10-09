@@ -89,7 +89,7 @@
   const QTY_UNITS = { kg: "kg", g: "g", pcs: "pcs", l: "l", ml: "ml" };
   const PRICE_UNITS = { total: "total", kg: "per kg", g: "per g", pcs: "per piece", l: "per l", ml: "per ml" };
   const PRICE_SUFFIX = { total: "", kg: "/kg", g: "/g", pcs: "/piece", l: "/l", ml: "/ml" };
-  const numFmt = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 3 });
+  const numFmt = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 3, useGrouping: false });
   const toNum = (v) => {
     if (v == null || v === "") return null;
     const n = Number(String(v).replace(/\s|€/g, "").replace(",", "."));
@@ -103,6 +103,20 @@
     if (qd !== pd) return null;
     return Math.round(price * qty * qb / pb * 100) / 100;
   }
+  // Minimum order: bill the larger of what was asked and the minimum (in the asked unit)
+  function billedQty(qty, qtyUnit, min, minUnit) {
+    if (min == null || isNaN(min) || !minUnit) return { qty, unit: qtyUnit, raised: false };
+    if (qty == null || isNaN(qty) || !qtyUnit) return { qty: min, unit: minUnit, raised: true };
+    if (!UNIT[qtyUnit] || !UNIT[minUnit] || UNIT[qtyUnit][0] !== UNIT[minUnit][0]) return { qty: null, unit: qtyUnit, raised: false, mismatch: true };
+    const minInQty = min * UNIT[minUnit][1] / UNIT[qtyUnit][1];
+    return minInQty > qty ? { qty: minInQty, unit: qtyUnit, raised: true } : { qty, unit: qtyUnit, raised: false };
+  }
+  function lineTotalMin(price, priceUnit, qty, qtyUnit, min, minUnit) {
+    const b = billedQty(qty, qtyUnit, min, minUnit);
+    if (b.mismatch && priceUnit !== "total") return null;
+    return lineTotal(price, priceUnit, b.qty, b.unit);
+  }
+
   // "3 kg", "250g", "12 pieces", "1,5 l" -> { amount, unit }
   function parseQty(text) {
     const m = String(text || "").toLowerCase().match(/(\d+(?:[.,]\d+)?)\s*(kg|kilo\w*|g|gr|gram\w*|ml|l|lt|lit\w*|pcs?|pz|pezz\w*|piece\w*|x)?/);
@@ -134,7 +148,7 @@
 
   window.EP = {
     chefSplit,
-    QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, parseQty, toNum, fmtNum: (n) => (n == null ? "" : numFmt.format(Number(n))),
+    QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, billedQty, lineTotalMin, parseQty, toNum, fmtNum: (n) => (n == null ? "" : numFmt.format(Number(n))),
     setChefColors, chefStyle, photoUrl,
     sb, esc, dinnerDate, STATUS, toast, store,
     shortDate: (ts) => (ts ? shortFmt.format(new Date(ts)) : ""),

@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=17">
+  <link rel="stylesheet" href="assets/style.css?v=19">
   <script>
     // Admin sign-in links may land on the homepage: forward them to the admin page.
     (function () {
@@ -105,10 +105,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=8"></script>
+  <script src="assets/common.js?v=10"></script>
   <script>
   (function () {
-    const { chefSplit, lineTotal, PRICE_SUFFIX, fmtNum, sb, esc, dinnerDate, STATUS, toast, store, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
+    const { chefSplit, lineTotal, lineTotalMin, billedQty, PRICE_SUFFIX, fmtNum, sb, esc, dinnerDate, STATUS, toast, store, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
     const $ = (id) => document.getElementById(id);
 
     let dinners = [];
@@ -195,8 +195,11 @@
       const url = photoUrl(o.photo_path);
       const qty = o.qty_amount != null ? `${fmtNum(o.qty_amount)} ${o.qty_unit || ""}`.trim() : o.quantity;
       const title = [o.product, qty].filter(Boolean).join(" · ");
-      const t = o.line_total != null ? o.line_total : lineTotal(o.price, o.price_unit, o.qty_amount, o.qty_unit);
-      const calc = o.price != null && o.price_unit && o.price_unit !== "total" ? `${price(o.price)}${PRICE_SUFFIX[o.price_unit]}` : "";
+      const t = o.line_total != null ? o.line_total : lineTotalMin(o.price, o.price_unit, o.qty_amount, o.qty_unit, o.min_amount, o.min_unit);
+      const b = billedQty(o.qty_amount, o.qty_unit, o.min_amount, o.min_unit);
+      const unitPrice = o.price != null && o.price_unit && o.price_unit !== "total" ? `${price(o.price)}${PRICE_SUFFIX[o.price_unit]}` : "";
+      const minTxt = o.min_amount != null ? `Min. order ${fmtNum(o.min_amount)} ${o.min_unit || ""}`.trim() : "";
+      const calc = [unitPrice, minTxt, b.raised && unitPrice ? "minimum applies" : ""].filter(Boolean).join(" · ");
       return `<div class="offer-view ${o.selected ? "chosen" : ""}">
         ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" title="Open photo"><img src="${esc(url)}" alt="${esc(o.product || "Product photo")}" loading="lazy"></a>` : ""}
         <div class="ov-main">

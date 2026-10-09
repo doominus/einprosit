@@ -382,9 +382,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 /* ---------- units in admin lines ---------- */
 .offer-fields { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .offer-fields [data-k=supplier], .offer-fields [data-k=product] { grid-column: span 3; }
-.offer-fields .unit-field, .offer-fields .offer-note { grid-column: span 2; }
+.offer-fields .unit-field { grid-column: span 2; }
+.offer-fields .offer-note { grid-column: 1 / -1; }
 .unit-field select { max-width: 92px; }
-.unit-field { display: flex; min-width: 0; }
+.unit-field { display: flex; min-width: 0; position: relative; margin-top: 6px; }
+.unit-field::before { content: attr(data-label); position: absolute; top: -7px; left: 8px; font-size: 10px; line-height: 1; padding: 0 4px; background: var(--card); color: var(--ink-3); border-radius: 4px; z-index: 1; pointer-events: none; }
 .unit-field input { flex: 1 1 0; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .unit-field select { flex: none; width: auto; padding: 7px 6px; font-size: 13px; border-radius: 0 8px 8px 0; border-left: 0; background: var(--surface); color: var(--ink-2); }
 .offer-side { display: grid; justify-items: end; gap: 6px; min-width: 120px; }

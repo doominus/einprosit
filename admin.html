@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=17">
+  <link rel="stylesheet" href="assets/style.css?v=19">
 </head>
 <body>
 
@@ -94,10 +94,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=8"></script>
+  <script src="assets/common.js?v=10"></script>
   <script>
   (function () {
-    const { chefSplit, sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle, photoUrl, QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, parseQty, toNum, fmtNum } = window.EP;
+    const { chefSplit, sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle, photoUrl, QTY_UNITS, PRICE_UNITS, PRICE_SUFFIX, lineTotal, billedQty, lineTotalMin, parseQty, toNum, fmtNum } = window.EP;
     const $ = (id) => document.getElementById(id);
     const views = ["loading", "login", "denied", "app"];
     const show = (id) => views.forEach((v) => $(v).classList.toggle("hidden", v !== id));
@@ -263,11 +263,15 @@
         <div class="offer-fields">
           <input type="text" data-k="supplier" maxlength="120" value="${esc(o.supplier || "")}" placeholder="Supplier" aria-label="Supplier">
           <input type="text" data-k="product" maxlength="160" value="${esc(o.product || "")}" placeholder="Product / brand" aria-label="Product">
-          <div class="unit-field">
+          <div class="unit-field" data-label="Quantity">
             <input type="text" data-k="qty_amount" inputmode="decimal" value="${decIn(o.qty_amount)}" placeholder="Qty" aria-label="Quantity">
             <select data-k="qty_unit" aria-label="Quantity unit">${opts(QTY_UNITS, qtyUnit)}</select>
           </div>
-          <div class="unit-field">
+          <div class="unit-field" data-label="Min. order (optional)" title="Minimum order: if the chef asks for less, this amount is billed">
+            <input type="text" data-k="min_amount" inputmode="decimal" value="${decIn(o.min_amount)}" placeholder="—" aria-label="Minimum order">
+            <select data-k="min_unit" aria-label="Minimum order unit">${opts(QTY_UNITS, o.min_unit || qtyUnit)}</select>
+          </div>
+          <div class="unit-field" data-label="Price">
             <input type="text" data-k="price" inputmode="decimal" value="${decIn(o.price)}" placeholder="€ 0,00" aria-label="Price">
             <select data-k="price_unit" aria-label="Price is">${opts(PRICE_UNITS, priceUnit)}</select>
           </div>
@@ -325,10 +329,11 @@
           id: el.dataset.offer || null,
           supplier: v("supplier").value, product: v("product").value,
           qty_amount: toNum(v("qty_amount").value), qty_unit: v("qty_unit").value,
+          min_amount: toNum(v("min_amount").value), min_unit: toNum(v("min_amount").value) == null ? null : v("min_unit").value,
           price: toNum(v("price").value), price_unit: v("price_unit").value,
           note: v("note").value, photo_path: v("photo_path").value || null, selected: v("selected").checked,
         };
-      }).filter((o) => o.id || o.supplier.trim() || o.product.trim() || o.qty_amount != null || o.price != null || o.note.trim() || o.photo_path);
+      }).filter((o) => o.id || o.supplier.trim() || o.product.trim() || o.qty_amount != null || o.min_amount != null || o.price != null || o.note.trim() || o.photo_path);
     }
 
     // per-line "= €xx" and the request total, same maths as the database
@@ -337,14 +342,17 @@
       li.querySelectorAll(".offer").forEach((el) => {
         const v = (k) => el.querySelector(`[data-k="${k}"]`).value;
         const pr = toNum(v("price")), q = toNum(v("qty_amount")), pu = v("price_unit"), qu = v("qty_unit");
-        const t = lineTotal(pr, pu, q, qu);
+        const mn = toNum(v("min_amount")), mu = mn == null ? null : v("min_unit");
+        const b = billedQty(q, qu, mn, mu);
+        const t = lineTotalMin(pr, pu, q, qu, mn, mu);
         const out = el.querySelector("[data-line-total]");
-        out.classList.toggle("warn", pr != null && t == null);
-        out.textContent = pr == null ? "" : t != null
-          ? (pu === "total" ? "= " + price(t) : `${fmtNum(q)} ${qu} × ${price(pr)}${PRICE_SUFFIX[pu]} = ${price(t)}`)
-          : (q == null ? "Add the quantity" : "Units don't match");
+        out.classList.toggle("warn", (pr != null && t == null) || !!b.mismatch);
+        out.textContent = pr == null ? (b.mismatch ? "Min. order unit doesn't match" : b.raised ? `Min. order ${fmtNum(mn)} ${mu} applies` : "")
+          : t != null
+            ? (pu === "total" ? "= " + price(t) : `${b.raised ? `min. ${fmtNum(mn)} ${mu}` : `${fmtNum(b.qty)} ${b.unit}`} × ${price(pr)}${PRICE_SUFFIX[pu]} = ${price(t)}`)
+            : (b.mismatch ? "Min. order unit doesn't match" : b.qty == null ? "Add the quantity" : "Units don't match");
       });
-      const totals = offers.map((o) => ({ ...o, t: lineTotal(o.price, o.price_unit, o.qty_amount, o.qty_unit) }));
+      const totals = offers.map((o) => ({ ...o, t: lineTotalMin(o.price, o.price_unit, o.qty_amount, o.qty_unit, o.min_amount, o.min_unit) }));
       const chosen = totals.filter((o) => o.selected);
       const use = chosen.length ? chosen : totals.length === 1 ? totals : [];
       const nums = use.map((o) => o.t).filter((n) => n != null);
@@ -441,7 +449,7 @@
       const note = li.querySelector('[data-k="admin_note"]').value.trim();
       if (li.querySelector(".offer.uploading")) return toast("Wait for the photo to finish uploading", true);
       const offersToSave = readOffers(li);
-      const bad = offersToSave.find((o) => (o.price != null && (isNaN(o.price) || o.price < 0)) || (o.qty_amount != null && (isNaN(o.qty_amount) || o.qty_amount < 0)));
+      const bad = offersToSave.find((o) => (o.price != null && (isNaN(o.price) || o.price < 0)) || (o.qty_amount != null && (isNaN(o.qty_amount) || o.qty_amount < 0)) || (o.min_amount != null && (isNaN(o.min_amount) || o.min_amount < 0)));
       if (bad) return toast("Check the numbers — use something like 12,50", true);
       btn.disabled = true;
       const { error } = await sb.rpc("admin_save_request", { p_id: id, p_status: status, p_admin_note: note, p_offers: offersToSave });
