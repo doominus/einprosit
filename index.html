@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=11">
+  <link rel="stylesheet" href="assets/style.css?v=13">
   <script>
     // Admin sign-in links may land on the homepage: forward them to the admin page.
     (function () {
@@ -100,10 +100,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=4"></script>
+  <script src="assets/common.js?v=5"></script>
   <script>
   (function () {
-    const { sb, esc, dinnerDate, STATUS, toast, store, shortDate, price, setChefColors, chefStyle } = window.EP;
+    const { sb, esc, dinnerDate, STATUS, toast, store, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
     const $ = (id) => document.getElementById(id);
 
     let dinners = [];
@@ -169,14 +169,29 @@
 
     async function loadRequests() {
       const id = currentId;
-      const { data, error } = await sb.rpc("list_requests", { p_dinner: id });
+      const { data, error } = await sb.rpc("list_requests_v2", { p_dinner: id });
       if (id !== currentId) return;
       if (error) { toast("Couldn't load the requests", true); return; }
       renderRequests(data || []);
     }
 
     let rowsById = {};
+    function offerView(o) {
+      const url = photoUrl(o.photo_path);
+      const title = [o.product, o.quantity].filter(Boolean).join(" · ");
+      return `<div class="offer-view ${o.selected ? "chosen" : ""}">
+        ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" title="Open photo"><img src="${esc(url)}" alt="${esc(o.product || "Product photo")}" loading="lazy"></a>` : ""}
+        <div class="ov-main">
+          ${title ? `<b>${esc(title)}</b>` : `<b>Option</b>`}
+          ${o.note ? `<div class="ov-note">${esc(o.note)}</div>` : ""}
+        </div>
+        ${o.selected ? `<span class="ov-chosen">Chosen</span>` : ""}
+        ${o.price != null ? `<span class="ov-price">${price(o.price)}</span>` : ""}
+      </div>`;
+    }
+
     function renderRequests(rows) {
+      const openRows = new Set([...document.querySelectorAll(".req-row.open")].map((x) => x.dataset.id));
       rowsById = Object.fromEntries(rows.map((r) => [r.id, r]));
       const c = { in_attesa: 0, disponibile: 0, non_disponibile: 0 };
       let total = 0;
@@ -193,14 +208,17 @@
         return;
       }
       $("reqList").innerHTML = rows.map((r) => `
-        <li class="req-row" tabindex="0" title="${esc([r.item, r.quantity, r.notes, r.admin_note ? "Antica Maddalena: " + r.admin_note : ""].filter(Boolean).join(" · "))}">
+        <li class="req-row ${openRows.has(r.id) ? "open" : ""}" data-id="${r.id}" tabindex="0" title="${esc([r.item, r.quantity, r.notes, r.admin_note ? "Antica Maddalena: " + r.admin_note : ""].filter(Boolean).join(" · "))}">
           <span class="tag" style="${chefStyle(r.chef_name)}">${esc(r.chef_name)}</span>
           <span class="item">${esc(r.item)}</span>
           ${r.quantity ? `<span class="qty">${esc(r.quantity)}</span>` : ""}
           <span class="notes">${esc(r.notes || "")}${r.admin_note ? `${r.notes ? " · " : ""}<b>Antica Maddalena:</b> ${esc(r.admin_note)}` : ""}</span>
+          ${(r.offers || []).some((o) => o.photo_path) ? `<span class="photo-dot" title="Has photos"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>` : ""}
+          ${(r.offers || []).length > 1 ? `<span class="opts">${r.offers.length} options</span>` : ""}
           <span class="date">${esc(shortDate(r.created_at))}</span>
           ${r.status === "disponibile" && r.price != null ? `<span class="price">${price(r.price)}</span>` : ""}
           <span class="pill ${r.status}">${STATUS[r.status]}</span>
+          ${(r.offers || []).length ? `<div class="offer-list">${r.offers.map(offerView).join("")}</div>` : ""}
           <span class="row-actions">
             <button type="button" class="row-btn" data-act="edit" data-id="${r.id}" aria-label="Edit request" title="Edit">
               <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>
@@ -214,6 +232,7 @@
 
     // Tap a row to read long notes in full
     $("reqList").addEventListener("click", async (e) => {
+      if (e.target.closest(".offer-list a")) return;
       const btn = e.target.closest(".row-btn");
       if (!btn) { e.target.closest(".req-row")?.classList.toggle("open"); return; }
       const r = rowsById[btn.dataset.id];

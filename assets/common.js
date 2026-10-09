@@ -70,8 +70,11 @@
     return `--tag-bg:${bg};--tag-fg:${fg}`;
   }
 
+  const photoUrl = (path) =>
+    path ? `${window.EP_CONFIG.supabaseUrl}/storage/v1/object/public/product-photos/${String(path).split("/").map(encodeURIComponent).join("/")}` : "";
+
   window.EP = {
-    setChefColors, chefStyle,
+    setChefColors, chefStyle, photoUrl,
     sb, esc, dinnerDate, STATUS, toast, store,
     shortDate: (ts) => (ts ? shortFmt.format(new Date(ts)) : ""),
     price: (n) => (n == null ? "" : priceFmt.format(Number(n))),

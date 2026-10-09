@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=11">
+  <link rel="stylesheet" href="assets/style.css?v=13">
 </head>
 <body>
 
@@ -89,10 +89,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js?v=3"></script>
-  <script src="assets/common.js?v=4"></script>
+  <script src="assets/common.js?v=5"></script>
   <script>
   (function () {
-    const { sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle } = window.EP;
+    const { sb, esc, dinnerDate, STATUS, toast, shortDate, price, setChefColors, chefStyle, photoUrl } = window.EP;
     const $ = (id) => document.getElementById(id);
     const views = ["loading", "login", "denied", "app"];
     const show = (id) => views.forEach((v) => $(v).classList.toggle("hidden", v !== id));
@@ -161,8 +161,12 @@
     }
 
     async function loadRequests() {
-      const { data, error } = await sb.from("ingredient_requests").select("*").order("created_at", { ascending: false });
+      const { data, error } = await sb.from("ingredient_requests")
+        .select("*, request_offers(*)")
+        .is("request_offers.removed_at", null)
+        .order("created_at", { ascending: false });
       if (error) return toast("Couldn't load requests", true);
+      data.forEach((r) => (r.request_offers || []).sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)));
       requests = data;
       render();
     }
@@ -171,6 +175,7 @@
       if (channel) return;
       channel = sb.channel("requests")
         .on("postgres_changes", { event: "*", schema: "public", table: "ingredient_requests" }, () => loadRequests())
+        .on("postgres_changes", { event: "*", schema: "public", table: "request_offers" }, () => loadRequests())
         .subscribe((status) => {
           $("live").style.color = status === "SUBSCRIBED" ? "var(--ok)" : "var(--ink-3)";
         });
@@ -215,39 +220,111 @@
         <span class="stat"><b>${c.non_disponibile}</b> not available</span>
         <span class="stat"><b>${price(total)}</b> confirmed total</span>`;
 
-      // Don't redraw a row while it is being edited
-      const editing = document.activeElement?.closest(".req")?.dataset.id;
+      // Don't redraw while a request has unsaved changes or is being typed in
+      const list = $("reqList");
+      const busy = list.querySelector(".req[data-dirty]") || document.activeElement?.closest("#reqList .req");
       const rows = mine.filter((r) => filter === "all" || r.status === filter);
+      if (busy && list.dataset.dinner === currentId) return;
+      list.dataset.dinner = currentId;
       if (!rows.length) {
-        $("reqList").innerHTML = `<li class="empty">No requests${filter !== "all" ? " with this status" : ""}.</li>`;
+        list.innerHTML = `<li class="empty">No requests${filter !== "all" ? " with this status" : ""}.</li>`;
         return;
       }
-      if (editing && rows.some((r) => r.id === editing)) return;
+      list.innerHTML = rows.map(requestCard).join("");
+    }
 
-      $("reqList").innerHTML = rows.map((r) => `
-        <li class="req admin-req" data-id="${r.id}">
-          <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
-            <div class="item">${esc(r.item)}${r.quantity ? ` <span class="qty">· ${esc(r.quantity)}</span>` : ""}</div>
-            <span class="pill ${r.status}">${STATUS[r.status]}</span>
-          </div>
-          ${r.notes ? `<div class="notes">${esc(r.notes)}</div>` : ""}
-          <div class="meta"><span class="tag" style="${chefStyle(r.chef_name)}">${esc(r.chef_name)}</span><span>${esc(shortDate(r.created_at))}</span></div>
-          <div class="admin-controls">
-            <label>Availability
-              <select data-k="status">
-                ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === r.status ? "selected" : ""}>${v}</option>`).join("")}
-              </select>
-            </label>
-            <label>Price €
-              <input type="number" data-k="price" min="0" step="0.01" inputmode="decimal" value="${r.price ?? ""}" placeholder="0.00">
-            </label>
-            <label class="note-field">Note for the chef
-              <input type="text" data-k="admin_note" maxlength="500" value="${esc(r.admin_note || "")}" placeholder="e.g. arrives Friday morning">
-            </label>
-            <button class="btn small" data-act="save">Save</button>
-          </div>
-          <div style="text-align:right"><button class="btn danger small" data-act="del" style="padding:4px 10px;font-size:12px">Delete</button></div>
-        </li>`).join("");
+    function offerLine(o) {
+      o = o || {};
+      const url = photoUrl(o.photo_path);
+      return `<div class="offer" data-offer="${esc(o.id || "")}">
+        <label class="offer-photo" title="${url ? "Change photo" : "Add a photo"}">
+          <input type="file" accept="image/*" data-k="photo" hidden>
+          <input type="hidden" data-k="photo_path" value="${esc(o.photo_path || "")}">
+          ${url ? `<img src="${esc(url)}" alt="">` : `<span class="ph">+ Photo</span>`}
+        </label>
+        <div class="offer-fields">
+          <input type="text" data-k="supplier" maxlength="120" value="${esc(o.supplier || "")}" placeholder="Supplier" aria-label="Supplier">
+          <input type="text" data-k="product" maxlength="160" value="${esc(o.product || "")}" placeholder="Product / brand" aria-label="Product">
+          <input type="text" data-k="quantity" maxlength="60" value="${esc(o.quantity || "")}" placeholder="Qty" aria-label="Quantity">
+          <input type="text" data-k="price" inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" value="${o.price != null ? String(o.price).replace(".", ",") : ""}" placeholder="€ 0,00" aria-label="Price">
+          <input type="text" data-k="note" maxlength="500" value="${esc(o.note || "")}" placeholder="Note (visible to chefs)" aria-label="Line note" class="offer-note">
+        </div>
+        <label class="offer-pick" title="Chosen: counts in the total">
+          <input type="checkbox" data-k="selected" ${o.selected ? "checked" : ""}><span>Chosen</span>
+        </label>
+        <button type="button" class="row-btn danger" data-act="rm-line" aria-label="Remove line" title="Remove line">×</button>
+      </div>`;
+    }
+
+    function requestCard(r) {
+      const offers = r.request_offers || [];
+      return `<li class="req admin-req" data-id="${r.id}">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
+          <div class="item">${esc(r.item)}${r.quantity ? ` <span class="qty">· ${esc(r.quantity)}</span>` : ""}</div>
+          <span class="pill ${r.status}">${STATUS[r.status]}</span>
+        </div>
+        ${r.notes ? `<div class="notes">${esc(r.notes)}</div>` : ""}
+        <div class="meta"><span class="tag" style="${chefStyle(r.chef_name)}">${esc(r.chef_name)}</span><span>${esc(shortDate(r.created_at))}</span></div>
+
+        <div class="offers-box">
+          <div class="offers-head"><span>Suppliers &amp; prices</span><span class="hint">Tick "Chosen" on the lines you'll buy — their prices make the total.</span></div>
+          <div class="offers">${offers.map(offerLine).join("")}</div>
+          <button type="button" class="btn ghost small" data-act="add-line">+ Add line</button>
+        </div>
+
+        <div class="admin-controls">
+          <label>Availability
+            <select data-k="status">
+              ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === r.status ? "selected" : ""}>${v}</option>`).join("")}
+            </select>
+          </label>
+          <label class="note-field">Note for the chef
+            <input type="text" data-k="admin_note" maxlength="500" value="${esc(r.admin_note || "")}" placeholder="e.g. arrives Friday morning">
+          </label>
+          <div class="req-total"><span>Total</span><b data-total>${r.price != null ? price(r.price) : "—"}</b></div>
+          <button class="btn small" data-act="save">Save</button>
+        </div>
+        <div class="req-foot">
+          <span class="unsaved">Unsaved changes</span>
+          <button class="btn danger small" data-act="del" style="padding:4px 10px;font-size:12px">Delete request</button>
+        </div>
+      </li>`;
+    }
+
+    function readOffers(li) {
+      return [...li.querySelectorAll(".offer")].map((el) => {
+        const v = (k) => el.querySelector(`[data-k="${k}"]`);
+        const pr = v("price").value.replace(/\s|€/g, "").replace(",", ".");
+        return {
+          id: el.dataset.offer || null,
+          supplier: v("supplier").value, product: v("product").value, quantity: v("quantity").value,
+          price: pr === "" ? null : pr, note: v("note").value,
+          photo_path: v("photo_path").value || null, selected: v("selected").checked,
+        };
+      }).filter((o) => o.id || o.supplier.trim() || o.product.trim() || o.quantity.trim() || o.price != null || o.note.trim() || o.photo_path);
+    }
+
+    function updateTotal(li) {
+      const offers = readOffers(li);
+      const chosen = offers.filter((o) => o.selected);
+      const use = chosen.length ? chosen : offers.length === 1 ? offers : [];
+      const nums = use.filter((o) => o.price != null).map((o) => Number(o.price)).filter((n) => !isNaN(n) && n >= 0);
+      li.querySelector("[data-total]").textContent = nums.length ? price(nums.reduce((a, b) => a + b, 0)) : "—";
+    }
+
+    function markDirty(li) { li.dataset.dirty = "1"; }
+
+    // Shrink photos before upload (phone pictures are large)
+    async function shrink(file) {
+      try {
+        const bmp = await createImageBitmap(file);
+        const max = 1600, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+        c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+        const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.85));
+        return blob || file;
+      } catch { return file; }
     }
 
     function toLocalInput(ts) {
@@ -260,6 +337,8 @@
     $("dinnerList").addEventListener("click", (e) => {
       const b = e.target.closest(".dinner-btn");
       if (!b) return;
+      if (document.querySelector(".req[data-dirty]") && !confirm("You have unsaved changes. Leave them?")) return;
+      document.querySelectorAll(".req[data-dirty]").forEach((x) => delete x.dataset.dirty);
       currentId = b.dataset.id;
       document.activeElement?.blur();
       render();
@@ -269,6 +348,8 @@
     $("filters").addEventListener("click", (e) => {
       const c = e.target.closest(".chip");
       if (!c) return;
+      if (document.querySelector(".req[data-dirty]") && !confirm("You have unsaved changes. Leave them?")) return;
+      document.querySelectorAll(".req[data-dirty]").forEach((x) => delete x.dataset.dirty);
       filter = c.dataset.f;
       document.querySelectorAll("#filters .chip").forEach((x) => x.classList.toggle("on", x === c));
       render();
@@ -289,20 +370,66 @@
         return loadRequests();
       }
 
+      if (btn.dataset.act === "add-line") {
+        btn.previousElementSibling.insertAdjacentHTML("beforeend", offerLine());
+        btn.previousElementSibling.lastElementChild.querySelector('[data-k="supplier"]').focus();
+        markDirty(li);
+        return;
+      }
+      if (btn.dataset.act === "rm-line") {
+        btn.closest(".offer").remove();
+        markDirty(li); updateTotal(li);
+        return;
+      }
+      if (btn.dataset.act !== "save") return;
+
       const status = li.querySelector('[data-k="status"]').value;
-      const priceRaw = li.querySelector('[data-k="price"]').value.replace(",", ".");
       const note = li.querySelector('[data-k="admin_note"]').value.trim();
+      if (li.querySelector(".offer.uploading")) return toast("Wait for the photo to finish uploading", true);
+      const bad = readOffers(li).find((o) => o.price != null && !/^\d+(\.\d{1,2})?$/.test(o.price));
+      if (bad) return toast(`Check the price "${bad.price}" — use a number like 12,50`, true);
       btn.disabled = true;
-      const { error } = await sb.from("ingredient_requests").update({
-        status,
-        price: priceRaw === "" ? null : Number(priceRaw),
-        admin_note: note || null,
-      }).eq("id", id);
+      const { error } = await sb.rpc("admin_save_request", { p_id: id, p_status: status, p_admin_note: note, p_offers: readOffers(li) });
       btn.disabled = false;
       btn.blur();
       if (error) return toast(error.message, true);
+      delete li.dataset.dirty;
       toast("Saved");
       loadRequests();
+    });
+
+    $("reqList").addEventListener("input", (e) => {
+      const li = e.target.closest(".req"); if (!li) return;
+      markDirty(li);
+      if (e.target.matches('[data-k="price"], [data-k="selected"]')) updateTotal(li);
+    });
+
+    $("reqList").addEventListener("change", async (e) => {
+      const li = e.target.closest(".req"); if (!li) return;
+      markDirty(li);
+      if (e.target.matches('[data-k="selected"]')) updateTotal(li);
+      if (!e.target.matches('[data-k="photo"]') || !e.target.files[0]) return;
+      const line = e.target.closest(".offer");
+      const box = line.querySelector(".offer-photo");
+      line.classList.add("uploading");
+      box.querySelector("img, .ph").outerHTML = `<span class="ph">Uploading…</span>`;
+      const blob = await shrink(e.target.files[0]);
+      const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+      const path = `${li.dataset.id}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await sb.storage.from("product-photos").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false });
+      line.classList.remove("uploading");
+      if (error) {
+        box.querySelector(".ph").textContent = "+ Photo";
+        return toast("Photo upload failed: " + error.message, true);
+      }
+      line.querySelector('[data-k="photo_path"]').value = path;
+      box.querySelector(".ph").outerHTML = `<img src="${esc(photoUrl(path))}" alt="">`;
+      e.target.value = "";
+      toast("Photo added — press Save to keep it");
+    });
+
+    window.addEventListener("beforeunload", (e) => {
+      if (document.querySelector(".req[data-dirty]")) { e.preventDefault(); e.returnValue = ""; }
     });
 
     $("dinnerForm").addEventListener("submit", async (e) => {
